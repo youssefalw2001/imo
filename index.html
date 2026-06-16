@@ -345,22 +345,28 @@
         }
       };
 
-      // Auto-skip for returning users (have Privy token = logged in before)
-      try {
-        if (localStorage.getItem('privy:token')) {
-          setTimeout(window.hideInitialLoading, 1500);
-        }
-      } catch(e) {}
+      // Only apply skip/timeout on non-rugs.fun domains (Render, staging, etc.)
+      // On the real rugs.fun site, let the app control the loading screen normally
+      var _isRealSite = (window.location.hostname === 'rugs.fun' || window.location.hostname === 'www.rugs.fun');
 
-      // Show skip button after 2s for everyone
-      setTimeout(function() {
-        var btn = document.getElementById('skip-btn');
-        if (btn) btn.style.display = 'inline-block';
-      }, 2000);
+      if (!_isRealSite) {
+        // Auto-skip for returning users (have Privy token = was logged in before)
+        try {
+          if (localStorage.getItem('privy:token')) {
+            setTimeout(window.hideInitialLoading, 1500);
+          }
+        } catch(e) {}
 
-      // HARD TIMEOUT — force-dismiss loading screen after 8s no matter what
-      // This prevents Privy domain errors or any other issue from locking users out
-      setTimeout(window.hideInitialLoading, 8000);
+        // Show skip button after 2s for everyone on non-rugs.fun domains
+        setTimeout(function() {
+          var btn = document.getElementById('skip-btn');
+          if (btn) btn.style.display = 'inline-block';
+        }, 2000);
+
+        // HARD TIMEOUT — force-dismiss after 8s so nobody ever gets stuck
+        // Needed because Privy blocks initialization on non-rugs.fun domains
+        setTimeout(window.hideInitialLoading, 8000);
+      }
     </script>
   <!-- Cloudflare Pages Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "8654f2873c6f4efd8adfdc2ae21240e0"}'></script><!-- Cloudflare Pages Analytics --></body>
 
