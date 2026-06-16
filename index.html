@@ -127,6 +127,31 @@
         position: relative;
       }
 
+      #skip-loading-btn {
+        margin-top: 18px;
+        background: transparent;
+        border: 1px solid rgba(255, 199, 0, 0.35);
+        color: rgba(255, 199, 0, 0.7);
+        padding: 8px 28px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        animation: fadeInBtn 0.4s ease;
+      }
+      #skip-loading-btn:hover {
+        background: rgba(255, 199, 0, 0.12);
+        border-color: rgba(255, 199, 0, 0.7);
+        color: #ffc700;
+      }
+      @keyframes fadeInBtn {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
       #initial-progress-fill::after {
         content: '';
         position: absolute;
@@ -297,6 +322,9 @@
           <div id="initial-progress-bar">
             <div id="initial-progress-fill"></div>
           </div>
+          <button id="skip-loading-btn" onclick="window.hideInitialLoading()" style="display:none;">
+            Skip
+          </button>
         </div>
       </div>
     </div>
@@ -342,6 +370,28 @@
           setTimeout(() => initialLoading.remove(), 300);
         }
       };
+
+      // --- Skip logic ---
+      // Check if user already has a Privy token (returning user / admin)
+      var _hasToken = false;
+      try {
+        var _t = localStorage.getItem('privy:token');
+        _hasToken = !!_t && _t.length > 10;
+      } catch(e) {}
+
+      // If returning user/admin: auto-skip after 1.5s (app loads fast for you)
+      // If new visitor: show skip button after 2s, hard-force skip after 8s
+      if (_hasToken) {
+        setTimeout(function() { window.hideInitialLoading(); }, 1500);
+      } else {
+        setTimeout(function() {
+          var btn = document.getElementById('skip-loading-btn');
+          if (btn) btn.style.display = 'inline-block';
+        }, 2000);
+      }
+
+      // Hard timeout — nobody gets stuck past 8 seconds
+      setTimeout(function() { window.hideInitialLoading(); }, 8000);
     </script>
   <!-- Cloudflare Pages Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "8654f2873c6f4efd8adfdc2ae21240e0"}'></script><!-- Cloudflare Pages Analytics --></body>
 
