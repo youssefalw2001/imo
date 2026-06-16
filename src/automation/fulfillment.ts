@@ -40,7 +40,14 @@ export interface FulfillmentResult {
 }
 
 interface AppConfig {
-  codashopUrl: string;
+  /** Source platform base URL. NOTE: Codashop does NOT sell IMO/Bigo/social-app
+   *  diamonds — it is a GAME top-up platform only. Confirmed IMO sellers are
+   *  BitTopup, Joytify, TOPUPlive and EnjoyGM. */
+  sourceUrl: string;
+  /** Whether the sourceUrl has been confirmed to list this app. */
+  verified: boolean;
+  /** CSS selectors below are STARTING POINTS only and MUST be verified against
+   *  the live page with browser devtools before production use. */
   userIdSelector: string;
   packageSelector: (diamonds: number) => string;
   confirmSelector: string;
@@ -48,38 +55,54 @@ interface AppConfig {
 }
 
 // ─── App Configuration ───────────────────────────────────────────────────────
+//
+// IMPORTANT (corrected after verification):
+//   - Codashop returns 404 for IMO and does not carry social/live-stream apps.
+//   - IMO is confirmed sold by: Joytify, BitTopup, TOPUPlive, EnjoyGM.
+//   - Bigo is confirmed sold by: Joytify, Smile.one (API), BitTopup.
+//   - Likee is confirmed sold by: BitTopup.
+//   - TikTok / Yalla source pages are NOT yet confirmed — verified=false.
+//
+// Selectors are placeholders. Each source site has its own DOM; you MUST open
+// the live page, inspect the real input/button selectors, and update them here
+// before relying on automation. Until verified=true, treat as manual-fulfil.
 
 const APP_CONFIGS: Record<string, AppConfig> = {
   imo: {
-    codashopUrl: 'https://www.codashop.com/en-bd/imo',
+    sourceUrl: 'https://www.joytify.com/en-us/imo',
+    verified: true, // joytify.com/en-us/imo confirmed live
     userIdSelector: 'input[name="userId"], input[placeholder*="ID"], #userId',
     packageSelector: (diamonds: number) => `[data-value="${diamonds}"], [data-denomination="${diamonds}"]`,
     confirmSelector: 'button[type="submit"], .buy-button, #confirm-purchase',
     successIndicator: '.success-message, .order-complete, [class*="success"]',
   },
   bigo: {
-    codashopUrl: 'https://www.codashop.com/en-bd/bigo-live',
+    sourceUrl: 'https://www.joytify.com/en-us/bigo-live',
+    verified: true, // joytify.com/en-us/bigo-live confirmed live
     userIdSelector: 'input[name="userId"], input[placeholder*="ID"], #userId',
     packageSelector: (diamonds: number) => `[data-value="${diamonds}"], [data-denomination="${diamonds}"]`,
     confirmSelector: 'button[type="submit"], .buy-button, #confirm-purchase',
     successIndicator: '.success-message, .order-complete, [class*="success"]',
   },
   likee: {
-    codashopUrl: 'https://www.codashop.com/en-bd/likee',
+    sourceUrl: 'https://bittopup.com/goods/likee-diamonds',
+    verified: false, // BitTopup sells Likee; exact URL/selectors need confirming
     userIdSelector: 'input[name="userId"], input[placeholder*="ID"], #userId',
     packageSelector: (diamonds: number) => `[data-value="${diamonds}"], [data-denomination="${diamonds}"]`,
     confirmSelector: 'button[type="submit"], .buy-button, #confirm-purchase',
     successIndicator: '.success-message, .order-complete, [class*="success"]',
   },
   tiktok: {
-    codashopUrl: 'https://www.codashop.com/en-bd/tiktok',
+    sourceUrl: 'https://www.joytify.com/en-us/tiktok',
+    verified: false, // NOT confirmed — verify source page exists before use
     userIdSelector: 'input[name="userId"], input[placeholder*="ID"], #userId',
     packageSelector: (diamonds: number) => `[data-value="${diamonds}"], [data-denomination="${diamonds}"]`,
     confirmSelector: 'button[type="submit"], .buy-button, #confirm-purchase',
     successIndicator: '.success-message, .order-complete, [class*="success"]',
   },
   yalla: {
-    codashopUrl: 'https://www.codashop.com/en-bd/yalla-live',
+    sourceUrl: 'https://www.joytify.com/en-us/yalla',
+    verified: false, // NOT confirmed — verify source page exists before use
     userIdSelector: 'input[name="userId"], input[placeholder*="ID"], #userId',
     packageSelector: (diamonds: number) => `[data-value="${diamonds}"], [data-denomination="${diamonds}"]`,
     confirmSelector: 'button[type="submit"], .buy-button, #confirm-purchase',
@@ -150,12 +173,25 @@ export async function fulfillOrder(order: FulfillmentOrder): Promise<Fulfillment
 
   let page: Page | null = null;
 
+  // Safety guard: never auto-purchase from an unverified source URL.
+  // This prevents the exact mistake of pointing at a page that may not exist.
+  if (!config.verified) {
+    return {
+      success: false,
+      orderId: order.orderId,
+      error: `Source for "${order.app}" (${config.sourceUrl}) is NOT verified. ` +
+        `Verify the page exists and update selectors before enabling auto-fulfilment. ` +
+        `Fulfil this order manually for now.`,
+      timestamp: new Date(),
+    };
+  }
+
   try {
     page = await getNewPage();
 
     // Step 1: Navigate to Codashop BD for the app
-    console.log(`[${order.orderId}] Navigating to ${config.codashopUrl}`);
-    await page.goto(config.codashopUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    console.log(`[${order.orderId}] Navigating to ${config.sourceUrl}`);
+    await page.goto(config.sourceUrl, { waitUntil: 'networkidle2', timeout: 30000 });
     await delay(2000);
 
     // Step 2: Enter customer's User ID
@@ -305,7 +341,7 @@ export async function checkBDPrices(app: string): Promise<PriceInfo[]> {
   
   try {
     page = await getNewPage();
-    await page.goto(config.codashopUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto(config.sourceUrl, { waitUntil: 'networkidle2', timeout: 30000 });
     await delay(2000);
 
     // Scrape all visible prices
@@ -336,7 +372,7 @@ export async function checkBDPrices(app: string): Promise<PriceInfo[]> {
       diamonds: p.diamonds,
       priceBDT: parseFloat(p.price.replace(/,/g, '')),
       priceUSD: parseFloat(p.price.replace(/,/g, '')) * BDT_TO_USD,
-      source: 'codashop-bd',
+      source: 'joytify',
     }));
 
   } catch (error) {
@@ -366,7 +402,7 @@ export async function healthCheck(): Promise<{ ok: boolean; message: string }> {
   try {
     const browser = await getBrowser();
     const page = await browser.newPage();
-    await page.goto('https://www.codashop.com/en-bd', { timeout: 15000 });
+    await page.goto('https://www.joytify.com/en-us', { timeout: 15000 });
     const title = await page.title();
     await page.close();
     return { ok: true, message: `Codashop BD accessible. Title: ${title}` };
