@@ -2,11 +2,7 @@ services:
   - type: web
     name: almasa-diamonds
     runtime: static
-    buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
-    envVars:
-      - key: NODE_VERSION
-        value: 22
+    staticPublishPath: ./
     headers:
       - path: /*
         name: X-Frame-Options
