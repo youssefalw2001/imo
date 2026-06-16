@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rugs.fun Analyzer</title>
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f1017;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #2a2d3e;
+    }
+    .header h1 { font-size: 1.4rem; color: #ffc700; letter-spacing: 1px; }
+    .conn-badge {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
+      padding: 4px 12px; border-radius: 20px;
+      background: #1e2030; border: 1px solid #2a2d3e;
+    }
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+    .conn-dot.connected { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+    .conn-dot.error { background: #ef4444; }
+    .grid-top {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .card {
+      background: #15161d;
+      border: 1px solid #2a2d3e;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card-title {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1.5px; color: #64748b; margin-bottom: 12px;
+    }
+</style>
+
+    .multiplier-display {
+      text-align: center;
+      padding: 20px 0;
+    }
+    .multiplier-value {
+      font-size: 4rem; font-weight: 900; line-height: 1;
+      transition: color 0.2s;
+      font-variant-numeric: tabular-nums;
+    }
+    .multiplier-value.safe   { color: #22c55e; text-shadow: 0 0 20px #22c55e55; }
+    .multiplier-value.warn   { color: #f59e0b; text-shadow: 0 0 20px #f59e0b55; }
+    .multiplier-value.danger { color: #ef4444; text-shadow: 0 0 20px #ef444455; }
+    .multiplier-value.crashed { color: #ef4444; text-shadow: 0 0 40px #ef4444aa; animation: crash-pulse 0.5s ease; }
+    @keyframes crash-pulse {
+      0%   { transform: scale(1.3); }
+      100% { transform: scale(1); }
+    }
+    .phase-badge {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .phase-round    { background: #16a34a33; color: #22c55e; border: 1px solid #22c55e66; }
+    .phase-preround { background: #1d4ed833; color: #60a5fa; border: 1px solid #3b82f666; }
+    .phase-crash    { background: #7f1d1d33; color: #ef4444; border: 1px solid #ef444466; }
+    .phase-cooldown { background: #33334433; color: #94a3b8; border: 1px solid #47506633; }
+    .danger-section { margin-top: 16px; }
+    .danger-label {
+      display: flex; justify-content: space-between;
+      font-size: 0.75rem; color: #94a3b8; margin-bottom: 6px;
+    }
+    .danger-label span:last-child { font-weight: 700; }
+    .danger-bar-track {
+      width: 100%; height: 10px; background: #1e2030;
+      border-radius: 5px; overflow: hidden;
+    }
+    .danger-bar-fill {
+      height: 100%; border-radius: 5px;
+      background: linear-gradient(to right, #22c55e, #f59e0b, #ef4444);
+      transition: width 0.4s ease;
+      position: relative;
+    }
+    .stats-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; margin-top: 4px;
+    }
+    .stat-item { background: #1a1b26; border-radius: 8px; padding: 10px 12px; }
+    .stat-label { font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
+    .stat-value { font-size: 1.3rem; font-weight: 700; color: #ffc700; margin-top: 2px; }
+    .survival-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 8px; margin-top: 10px;
+    }
+    .surv-item { background: #1a1b26; border-radius: 8px; padding: 8px; text-align: center; }
+    .surv-threshold { font-size: 0.65rem; color: #64748b; }
+    .surv-pct { font-size: 1rem; font-weight: 700; margin-top: 2px; }
+
+    .history-section { margin-bottom: 16px; }
+    .history-grid {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      max-height: 160px; overflow-y: auto;
+    }
+    .history-item {
+      padding: 5px 10px; border-radius: 6px;
+      font-size: 0.75rem; font-weight: 700;
+      cursor: default; transition: transform 0.1s;
+    }
+    .history-item:hover { transform: scale(1.05); }
+    .h-red    { background: #7f1d1d55; color: #f87171; border: 1px solid #ef444444; }
+    .h-orange { background: #78350f55; color: #fb923c; border: 1px solid #f9731644; }
+    .h-yellow { background: #78350f33; color: #fbbf24; border: 1px solid #f59e0b44; }
+    .h-green  { background: #14532d55; color: #4ade80; border: 1px solid #22c55e44; }
+    .h-blue   { background: #1e3a5f55; color: #60a5fa; border: 1px solid #3b82f644; }
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    canvas { width: 100% !important; }
+    .log-box {
+      background: #0a0b0f;
+      border: 1px solid #2a2d3e;
+      border-radius: 8px;
+      padding: 10px;
+      height: 80px;
+      overflow-y: auto;
+      font-size: 0.72rem;
+      font-family: monospace;
+      color: #64748b;
+    }
+    .log-entry { margin-bottom: 2px; }
+    .log-entry.crash { color: #ef4444; }
+    .log-entry.round { color: #22c55e; }
+    .log-entry.info  { color: #60a5fa; }
+    @media (max-width: 768px) {
+      .grid-top { grid-template-columns: 1fr; }
+      .charts-row { grid-template-columns: 1fr; }
+      .multiplier-value { font-size: 3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📈 Rugs.fun Analyzer</h1>
+    <div class="conn-badge">
+      <div class="conn-dot" id="connDot"></div>
+      <span id="connLabel">Connecting...</span>
+    </div>
+  </div>
+
+  <div class="grid-top">
+    <!-- Left: current round -->
+    <div class="card">
+      <div class="card-title">Current Round</div>
+      <div class="multiplier-display">
+        <div class="multiplier-value safe" id="multiplierVal">—</div>
+        <div style="margin-top:8px;">
+          <span class="phase-badge phase-preround" id="phaseBadge">Waiting...</span>
+        </div>
+        <div style="font-size:0.75rem; color:#64748b; margin-top:8px;" id="roundInfo">—</div>
+      </div>
+      <div class="danger-section">
+        <div class="danger-label">
+          <span>Crash Probability</span>
+          <span id="dangerPct">—</span>
+        </div>
+        <div class="danger-bar-track">
+          <div class="danger-bar-fill" id="dangerFill" style="width:0%"></div>
+        </div>
+        <div style="font-size:0.65rem; color:#475569; margin-top:4px;">
+          % of historical rounds that crashed at or below current multiplier
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: stats -->
+    <div class="card">
+      <div class="card-title">Stats — <span id="sampleCount">0</span> rounds</div>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-label">Avg Crash</div>
+          <div class="stat-value" id="statAvg">—</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Median Crash</div>
+          <div class="stat-value" id="statMedian">—</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Lowest Crash</div>
+          <div class="stat-value" id="statMin">—</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Highest Crash</div>
+          <div class="stat-value" id="statMax">—</div>
+        </div>
+      </div>
+      <div style="font-size:0.7rem; color:#64748b; margin: 12px 0 6px;">Survival chance past threshold</div>
+      <div class="survival-grid">
+        <div class="surv-item">
+          <div class="surv-threshold">Past 2x</div>
+          <div class="surv-pct" id="surv2x" style="color:#4ade80">—</div>
+        </div>
+        <div class="surv-item">
+          <div class="surv-threshold">Past 3x</div>
+          <div class="surv-pct" id="surv3x" style="color:#fbbf24">—</div>
+        </div>
+        <div class="surv-item">
+          <div class="surv-threshold">Past 5x</div>
+          <div class="surv-pct" id="surv5x" style="color:#fb923c">—</div>
+        </div>
+        <div class="surv-item">
+          <div class="surv-threshold">Past 10x</div>
+          <div class="surv-pct" id="surv10x" style="color:#f87171">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Live chart -->
+  <div class="charts-row">
+    <div class="card">
+      <div class="card-title">Live Round Chart</div>
+      <canvas id="liveChart" height="180"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Crash Distribution (last <span id="histCount">0</span> rounds)</div>
+      <canvas id="histChart" height="180"></canvas>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="card history-section">
+    <div class="card-title">Round History (newest first)</div>
+    <div class="history-grid" id="historyGrid">
+      <span style="color:#475569; font-size:0.8rem;">Waiting for data...</span>
+    </div>
+  </div>
+
+  <!-- Debug log -->
+  <div class="card" style="margin-bottom:8px;">
+    <div class="card-title">Event Log</div>
+    <div class="log-box" id="logBox"></div>
+  </div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+const BACKEND = 'https://backend.rugs.fun';
+let crashHistory = [];      // array of {multiplier, id, endedAt}
+let livePoints   = [];      // current round tick values
+let currentPhase = 'preround';
+let currentMult  = 1.0;
+let roundCount   = 0;
+
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
+const $mult     = document.getElementById('multiplierVal');
+const $phase    = document.getElementById('phaseBadge');
+const $rinfo    = document.getElementById('roundInfo');
+const $danger   = document.getElementById('dangerPct');
+const $dFill    = document.getElementById('dangerFill');
+const $connDot  = document.getElementById('connDot');
+const $connLbl  = document.getElementById('connLabel');
+const $grid     = document.getElementById('historyGrid');
+const $logBox   = document.getElementById('logBox');
+const $sampleN  = document.getElementById('sampleCount');
+const $histN    = document.getElementById('histCount');
+const $avg      = document.getElementById('statAvg');
+const $median   = document.getElementById('statMedian');
+const $min      = document.getElementById('statMin');
+const $max      = document.getElementById('statMax');
+const $s2       = document.getElementById('surv2x');
+const $s3       = document.getElementById('surv3x');
+const $s5       = document.getElementById('surv5x');
+const $s10      = document.getElementById('surv10x');
+
+// ─── Logging ──────────────────────────────────────────────────────────────────
+function log(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = 'log-entry ' + type;
+  el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  $logBox.prepend(el);
+  while ($logBox.children.length > 60) $logBox.removeChild($logBox.lastChild);
+}
+
+// ─── Chart.js setup ───────────────────────────────────────────────────────────
+Chart.defaults.color = '#64748b';
+Chart.defaults.borderColor = '#2a2d3e';
+
+const liveCtx = document.getElementById('liveChart').getContext('2d');
+const liveChart = new Chart(liveCtx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label: 'Multiplier',
+      data: [],
+      borderColor: '#22c55e',
+      backgroundColor: 'rgba(34,197,94,0.08)',
+      borderWidth: 2,
+      pointRadius: 0,
+      tension: 0.3,
+      fill: true,
+    }]
+  },
+  options: {
+    responsive: true,
+    animation: false,
+    scales: {
+      x: { display: false },
+      y: {
+        min: 1,
+        grid: { color: '#1e2030' },
+        ticks: { callback: v => v.toFixed(2) + 'x' }
+      }
+    },
+    plugins: { legend: { display: false } }
+  }
+});
+
+const histCtx = document.getElementById('histChart').getContext('2d');
+const BUCKETS = ['1–1.5x','1.5–2x','2–3x','3–5x','5–10x','10x+'];
+const BUCKET_COLORS = ['#ef4444','#f97316','#f59e0b','#84cc16','#22c55e','#60a5fa'];
+const histChart = new Chart(histCtx, {
+  type: 'bar',
+  data: {
+    labels: BUCKETS,
+    datasets: [{
+      label: 'Rounds',
+      data: [0,0,0,0,0,0],
+      backgroundColor: BUCKET_COLORS.map(c => c + 'cc'),
+      borderColor: BUCKET_COLORS,
+      borderWidth: 1,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    animation: false,
+    scales: {
+      y: {
+        grid: { color: '#1e2030' },
+        ticks: { precision: 0 }
+      },
+      x: { grid: { display: false } }
+    },
+    plugins: { legend: { display: false } }
+  }
+});
+
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function multColor(m) {
+  if (m < 2)  return 'danger';
+  if (m < 3)  return 'warn';
+  return 'safe';
+}
+
+function histClass(m) {
+  if (m < 2)  return 'h-red';
+  if (m < 3)  return 'h-orange';
+  if (m < 5)  return 'h-yellow';
+  if (m < 10) return 'h-green';
+  return 'h-blue';
+}
+
+function bucketIndex(m) {
+  if (m < 1.5) return 0;
+  if (m < 2)   return 1;
+  if (m < 3)   return 2;
+  if (m < 5)   return 3;
+  if (m < 10)  return 4;
+  return 5;
+}
+
+function pct(n, total) {
+  if (!total) return '—';
+  return Math.round((n / total) * 100) + '%';
+}
+
+function median(arr) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+// ─── Stats update ─────────────────────────────────────────────────────────────
+function updateStats() {
+  const vals = crashHistory.map(h => h.multiplier);
+  if (!vals.length) return;
+
+  const total = vals.length;
+  const avg   = vals.reduce((a, b) => a + b, 0) / total;
+  const med   = median(vals);
+  const mn    = Math.min(...vals);
+  const mx    = Math.max(...vals);
+
+  $avg.textContent    = avg.toFixed(2) + 'x';
+  $median.textContent = med.toFixed(2) + 'x';
+  $min.textContent    = mn.toFixed(2) + 'x';
+  $max.textContent    = mx.toFixed(2) + 'x';
+  $sampleN.textContent = total;
+
+  const survived = (threshold) =>
+    pct(vals.filter(v => v >= threshold).length, total);
+  $s2.textContent  = survived(2);
+  $s3.textContent  = survived(3);
+  $s5.textContent  = survived(5);
+  $s10.textContent = survived(10);
+
+  // Histogram
+  const buckets = [0,0,0,0,0,0];
+  vals.forEach(v => buckets[bucketIndex(v)]++);
+  histChart.data.datasets[0].data = buckets;
+  histChart.update();
+  $histN.textContent = total;
+}
+
+// ─── Danger meter ─────────────────────────────────────────────────────────────
+function updateDanger(mult) {
+  const vals = crashHistory.map(h => h.multiplier);
+  if (!vals.length) {
+    $danger.textContent = '—';
+    $dFill.style.width = '0%';
+    return;
+  }
+  const crashedBelow = vals.filter(v => v <= mult).length;
+  const pctVal = Math.round((crashedBelow / vals.length) * 100);
+  $danger.textContent = pctVal + '%';
+  $dFill.style.width  = pctVal + '%';
+}
+
+// ─── History grid ─────────────────────────────────────────────────────────────
+function rebuildHistory() {
+  $grid.innerHTML = '';
+  if (!crashHistory.length) {
+    $grid.innerHTML = '<span style="color:#475569; font-size:0.8rem;">Waiting for data...</span>';
+    return;
+  }
+  // Newest first
+  [...crashHistory].reverse().forEach(h => {
+    const el = document.createElement('div');
+    el.className = 'history-item ' + histClass(h.multiplier);
+    el.title = h.id ? `Round ${h.id}` : '';
+    el.textContent = h.multiplier.toFixed(2) + 'x';
+    $grid.appendChild(el);
+  });
+}
+
+// ─── Live chart ───────────────────────────────────────────────────────────────
+function pushLivePoint(val) {
+  livePoints.push(val);
+  if (livePoints.length > 500) livePoints.shift(); // cap at 500 points
+
+  const color = val < 2 ? '#ef4444' : val < 3 ? '#f59e0b' : '#22c55e';
+  liveChart.data.datasets[0].borderColor    = color;
+  liveChart.data.datasets[0].backgroundColor = color + '15';
+  liveChart.data.labels   = livePoints.map((_, i) => i);
+  liveChart.data.datasets[0].data = livePoints;
+  liveChart.options.scales.y.min = Math.max(0.9, Math.min(...livePoints) - 0.1);
+  liveChart.update('none');
+}
+
+function resetLiveChart(crashColor) {
+  // Keep last round visible briefly then clear
+  if (crashColor) {
+    liveChart.data.datasets[0].borderColor    = '#ef4444';
+    liveChart.data.datasets[0].backgroundColor = '#ef444415';
+    liveChart.update('none');
+  }
+  setTimeout(() => {
+    livePoints = [];
+    liveChart.data.labels = [];
+    liveChart.data.datasets[0].data = [];
+    liveChart.update('none');
+  }, 2000);
+}
+
+// ─── Phase display ────────────────────────────────────────────────────────────
+function setPhaseUI(phase, mult) {
+  const classMap = {
+    'round':    'phase-round',
+    'preround': 'phase-preround',
+    'crash':    'phase-crash',
+    'cooldown': 'phase-cooldown',
+  };
+  const labelMap = {
+    'round':    '🟢 LIVE',
+    'preround': '🔵 Betting',
+    'crash':    '💥 CRASHED',
+    'cooldown': '⏳ Cooldown',
+  };
+  $phase.className = 'phase-badge ' + (classMap[phase] || 'phase-cooldown');
+  $phase.textContent = labelMap[phase] || phase;
+
+  if (phase === 'preround' || phase === 'cooldown') {
+    $mult.textContent = '—';
+    $mult.className = 'multiplier-value safe';
+  } else if (phase === 'crash') {
+    $mult.textContent = (mult || currentMult).toFixed(2) + 'x';
+    $mult.className = 'multiplier-value crashed';
+  }
+}
+
+
+// ─── Socket connection ────────────────────────────────────────────────────────
+log('Connecting to ' + BACKEND + '...', 'info');
+
+const socket = io(BACKEND, {
+  transports: ['websocket', 'polling'],
+  reconnectionDelay: 2000,
+  reconnectionAttempts: Infinity,
+});
+
+socket.on('connect', () => {
+  $connDot.className = 'conn-dot connected';
+  $connLbl.textContent = 'Connected';
+  log('Socket connected. Requesting game stats...', 'info');
+
+  // Try to grab history from localStorage (if user is already logged in on rugs.fun in same browser)
+  try {
+    const token = localStorage.getItem('privy:token');
+    if (token) {
+      const raw = token.startsWith('"') ? JSON.parse(token) : token;
+      socket.emit('authenticate', { token: raw });
+      log('Auth token found — sent authenticate', 'info');
+    }
+  } catch (e) {}
+
+  // Request global history
+  socket.emit('game:standard:getGlobalHistory', {}, (data) => {
+    if (data && Array.isArray(data)) {
+      log('Got global history: ' + data.length + ' rounds', 'info');
+      processHistory(data);
+    }
+  });
+});
+
+socket.on('disconnect', (reason) => {
+  $connDot.className = 'conn-dot error';
+  $connLbl.textContent = 'Disconnected';
+  log('Disconnected: ' + reason, 'info');
+});
+
+socket.on('connect_error', (err) => {
+  $connDot.className = 'conn-dot error';
+  $connLbl.textContent = 'Error';
+  log('Connect error: ' + err.message, 'info');
+});
+
+// ─── Game events ──────────────────────────────────────────────────────────────
+
+// Stats broadcast — fires on connect and periodically
+socket.on('game:standard:stats', (data) => {
+  log('Received stats event', 'info');
+  if (data && data.gameHistory) {
+    processHistory(data.gameHistory);
+  }
+  // Also pull non-history stats fields
+  if (data && data.roundCount) {
+    roundCount = data.roundCount;
+  }
+});
+
+// Phase change (round start / crash)
+socket.on('game:standard:phase', (data) => {
+  const { phase, price, prices, timer } = data || {};
+  currentPhase = phase;
+
+  if (phase === 'round') {
+    // New round started
+    log(`New round started`, 'round');
+    currentMult = 1.0;
+    livePoints  = [1.0];
+    resetLiveChart(false);
+    setPhaseUI('round', 1.0);
+    $mult.textContent = '1.00x';
+    $mult.className = 'multiplier-value safe';
+    if (prices && prices.length) {
+      prices.forEach(p => pushLivePoint(p));
+    }
+    $rinfo.textContent = timer ? `Timer: ${(timer / 1000).toFixed(1)}s` : '';
+
+  } else if (phase === 'crash') {
+    // Game crashed
+    const crashMult = typeof price === 'number' ? price : currentMult;
+    log(`CRASHED at ${crashMult.toFixed(2)}x`, 'crash');
+    addCrashToHistory({ multiplier: crashMult, id: data.gameId, endedAt: Date.now() });
+    setPhaseUI('crash', crashMult);
+    resetLiveChart(true);
+    updateDanger(crashMult);
+
+  } else if (phase === 'preround' || phase === 'cooldown') {
+    setPhaseUI(phase, null);
+    $rinfo.textContent = timer ? `Next round in ${(timer / 1000).toFixed(1)}s` : '';
+  }
+});
+
+// Tick — live multiplier during a round
+socket.on('game:standard:tick', (data) => {
+  if (!data || !data.p) return;
+  const prices = data.p;
+  const latestPrice = prices[prices.length - 1];
+  if (typeof latestPrice !== 'number') return;
+
+  currentMult = latestPrice;
+
+  // Update display
+  $mult.textContent = latestPrice.toFixed(2) + 'x';
+  $mult.className   = 'multiplier-value ' + multColor(latestPrice);
+  pushLivePoint(latestPrice);
+  updateDanger(latestPrice);
+
+  // Update round info
+  $rinfo.textContent = `Tick: ${data.t || '?'}  |  Multiplier: ${latestPrice.toFixed(3)}x`;
+});
+
+// Round state on (re)connect — gives us the current state of the active round
+socket.on('game:standard:roundState', (data) => {
+  if (!data) return;
+  log('Round state received', 'info');
+});
+
+// ─── History processing ───────────────────────────────────────────────────────
+function processHistory(gameHistory) {
+  if (!Array.isArray(gameHistory)) return;
+  const newItems = [];
+  const existingIds = new Set(crashHistory.map(h => h.id));
+
+  gameHistory.forEach(g => {
+    const id   = g.id;
+    const mult = g.peakMultiplier || g.price || 1;
+    const endedAt = g.timestamp || g.endedAt || 0;
+    if (!existingIds.has(id) && mult > 0) {
+      newItems.push({ multiplier: parseFloat(mult.toFixed(4)), id, endedAt });
+    }
+  });
+
+  if (newItems.length) {
+    // Sort old + new by endedAt
+    crashHistory = [...crashHistory, ...newItems]
+      .sort((a, b) => a.endedAt - b.endedAt);
+    // Keep last 200
+    if (crashHistory.length > 200) {
+      crashHistory = crashHistory.slice(crashHistory.length - 200);
+    }
+    rebuildHistory();
+    updateStats();
+    updateDanger(currentMult);
+    log(`History updated: ${crashHistory.length} total rounds`, 'info');
+  }
+}
+
+function addCrashToHistory(entry) {
+  crashHistory.push(entry);
+  if (crashHistory.length > 200) crashHistory.shift();
+  rebuildHistory();
+  updateStats();
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+setPhaseUI('preround', null);
+log('Dashboard ready. Waiting for socket events...', 'info');
+</script>
+</body>
+</html>
