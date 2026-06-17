@@ -1,224 +1,285 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  
-<!-- Mirrored from rugs.fun/ by HTTrack Website Copier/3.x [XR&CO'2014], Tue, 16 Jun 2026 22:29:02 GMT -->
-<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
 <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" href="favicon.ico" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <title>Rugs</title>
-    <script>
-      window.__RUNTIME_ENV__ = {
-        VITE_BACKEND_URL: 'https://backend.rugs.fun',
-        VITE_API_URL: 'https://backend.rugs.fun/api',
-        VITE_HOT_WALLET_URL: 'https://backend.rugs.fun/api/hot-wallet',
-        VITE_PRIVY_APP_ID: 'cm826jprh00ntnjodv1etxlfl',
-        VITE_PRIVY_CLIENT_ID: 'client-WY5hqDPssYPd9RRKv5wJzKL6HgcmL3BuEGv5tWv9XNXwX',
-        VITE_DISCORD_CLIENT_ID: '1370560935189811310',
-        VITE_DISCORD_REDIRECT_URI: 'https://rugs.fun/discord-callback',
-        VITE_RPC_URL: '__VITE_RPC_URL__',
-        VITE_NODE_ENV: 'production',
-        VITE_SENTRY_DSN: 'https://e3c90e57de9ddab2ea1fd4477e1508a7@o4510115181625344.ingest.de.sentry.io/4510131656196176',
-        VITE_OTEL_ENABLED: 'true',
-        VITE_OTEL_ENDPOINT: 'https://telemetry.rugs.fun',
-        VITE_API_ASSIGN_URL: '__VITE_API_ASSIGN_URL__',
-        VITE_FRONTEND_VERSION: '1.0',
-        VITE_DEV_CLOCK_OVERRIDE: '__VITE_DEV_CLOCK_OVERRIDE__',
-        VITE_SEON_ENABLED: 'true',
-        VITE_SEON_REGION: '__VITE_SEON_REGION__',
-        // legacy nodeEnv key for backward-compat with code that reads window.__RUNTIME_ENV__.nodeEnv
-        nodeEnv: 'production',
-        devClockOverride: '__VITE_DEV_CLOCK_OVERRIDE__',
-      };
-    </script>
-    <!-- Material Symbols: https://fonts.google.com/icons -->
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0..1,0..200"
-    />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Rugs Tool</title>
+<link rel="icon" href="favicon.ico"/>
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0e15;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;padding:16px;max-width:900px;margin:0 auto}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 0 18px;border-bottom:1px solid #1e2030;margin-bottom:20px}
+.logo{font-size:1.2rem;font-weight:900;color:#ffc700;letter-spacing:1px}
+.conn{display:flex;align-items:center;gap:8px;padding:5px 14px;border-radius:20px;background:#15161d;border:1px solid #1e2030;font-size:.72rem;font-weight:700;text-transform:uppercase}
+.dot{width:8px;height:8px;border-radius:50%;background:#ef4444;transition:all .3s}
+.dot.on{background:#22c55e;box-shadow:0 0 8px #22c55e}
+.card{background:#15161d;border:1px solid #1e2030;border-radius:14px;padding:18px;margin-bottom:16px}
+.lbl{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#475569;margin-bottom:12px}
+/* Seed Result */
+.seed-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.result-box{background:#0d0e15;border-radius:12px;padding:16px;text-align:center}
+.big{font-size:2.8rem;font-weight:900;font-variant-numeric:tabular-nums;line-height:1}
+.green{color:#22c55e;text-shadow:0 0 20px #22c55e44}
+.gold{color:#ffc700;text-shadow:0 0 20px #ffc70044}
+.red{color:#ef4444}
+.res-lbl{font-size:.65rem;color:#475569;margin-top:6px}
+.cashout-box{background:#1a1b0a;border:1px solid #ffc70033;border-radius:12px;padding:16px;text-align:center}
+.cashout-val{font-size:2rem;font-weight:900;color:#ffc700}
+.cashout-lbl{font-size:.7rem;color:#a3a355;margin-top:4px}
+/* Live chart */
+.live-top{display:grid;grid-template-columns:160px 1fr;gap:16px;margin-bottom:16px}
+.mult-box{background:#0d0e15;border-radius:12px;padding:14px;text-align:center;display:flex;flex-direction:column;justify-content:center}
+.mult{font-size:2.6rem;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;transition:color .15s}
+.mult.safe{color:#22c55e;text-shadow:0 0 20px #22c55e33}
+.mult.warn{color:#f59e0b;text-shadow:0 0 20px #f59e0b33}
+.mult.hot{color:#ef4444;text-shadow:0 0 20px #ef444433}
+.mult.crash{color:#ef4444;text-shadow:0 0 40px #ef444499;animation:cp .4s}
+@keyframes cp{0%{transform:scale(1.2)}100%{transform:scale(1)}}
+.phase{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-top:8px}
+.ph-r{background:#14532d22;color:#22c55e;border:1px solid #22c55e44}
+.ph-p{background:#1e3a8a22;color:#60a5fa;border:1px solid #3b82f644}
+.ph-c{background:#7f1d1d22;color:#ef4444;border:1px solid #ef444444}
+.ph-w{background:#1e203022;color:#64748b;border:1px solid #47506633}
+/* Stats row */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat{background:#0d0e15;border-radius:10px;padding:10px;text-align:center}
+.stat-l{font-size:.58rem;color:#475569;text-transform:uppercase;letter-spacing:1px}
+.stat-v{font-size:1rem;font-weight:800;color:#ffc700;margin-top:3px}
+/* History */
+.hist{display:flex;flex-wrap:wrap;gap:5px;max-height:100px;overflow-y:auto}
+.h{padding:3px 8px;border-radius:5px;font-size:.68rem;font-weight:700}
+.hr{background:#7f1d1d22;color:#f87171;border:1px solid #ef444422}
+.ho{background:#78350f22;color:#fb923c;border:1px solid #f9731622}
+.hy{background:#78350022;color:#fbbf24;border:1px solid #f59e0b22}
+.hg{background:#14532d22;color:#4ade80;border:1px solid #22c55e22}
+.hb{background:#1e3a5f22;color:#60a5fa;border:1px solid #3b82f622}
+/* Auth box */
+.auth-row{display:flex;gap:10px}
+input{flex:1;background:#0d0e15;border:1px solid #1e2030;border-radius:8px;padding:9px 12px;color:#e2e8f0;font-family:monospace;font-size:.78rem;outline:none}
+input:focus{border-color:#ffc700}
+button{background:#ffc700;color:#0d0e15;border:none;border-radius:8px;padding:9px 18px;font-weight:800;font-size:.78rem;cursor:pointer;white-space:nowrap}
+button:hover{background:#ffd700}
+.info{font-size:.7rem;color:#475569;margin-top:8px}
+@media(max-width:600px){.seed-grid{grid-template-columns:1fr}.live-top{grid-template-columns:1fr}.stats-row{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
 
-    <!-- Preload font files -->
-    <link
-      rel="preload"
-      href="fonts/DynaPuff-VariableFont_wdth%2cwght.ttf"
-      as="font"
-      type="font/ttf"
-      crossorigin
-    />
-    <link rel="preload" href="fonts/DynaPuff-Regular.ttf" as="font" type="font/ttf" crossorigin />
-    <link rel="preload" href="fonts/DynaPuff-Medium.ttf" as="font" type="font/ttf" crossorigin />
-    <link rel="preload" href="fonts/DynaPuff-SemiBold.ttf" as="font" type="font/ttf" crossorigin />
-    <link rel="preload" href="fonts/DynaPuff-Bold.ttf" as="font" type="font/ttf" crossorigin />
-    <link
-      rel="preload"
-      href="fonts/GulfsDisplay-Variable.ttf"
-      as="font"
-      type="font/ttf"
-      crossorigin
-    />
-    <link
-      rel="preload"
-      href="fonts/GulfsDisplay-Normal.ttf"
-      as="font"
-      type="font/ttf"
-      crossorigin
-    />
+<div class="hdr">
+  <div class="logo">🎯 Rugs Tool</div>
+  <div class="conn"><div class="dot" id="dot"></div><span id="cLbl">Connecting...</span></div>
+</div>
 
-    <link rel="preload" href="rugsfun_logo.png" as="image" />
+<!-- Auth -->
+<div class="card">
+  <div class="lbl">Authentication</div>
+  <div class="auth-row">
+    <input id="tkIn" placeholder="Privy token (auto-loaded from localStorage)"/>
+    <button onclick="connect()">Connect</button>
+  </div>
+  <div class="info" id="authInfo">Auto-connecting with saved token...</div>
+</div>
 
+<!-- Seed Prediction -->
+<div class="card">
+  <div class="lbl">🔮 Next Round Prediction (from serverSeed)</div>
+  <div class="seed-grid">
+    <div class="result-box">
+      <div class="big green" id="peakVal">—</div>
+      <div class="res-lbl">Peak Multiplier</div>
+    </div>
+    <div class="cashout-box">
+      <div class="cashout-val" id="cashoutVal">—</div>
+      <div class="cashout-lbl">⬆ Recommended cashout (95% of peak)</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+    <div class="stat"><div class="stat-l">Crash Tick</div><div class="stat-v" id="tickVal">—</div></div>
+    <div class="stat"><div class="stat-l">Seed Status</div><div class="stat-v" id="seedStatus" style="font-size:.75rem;color:#64748b">Waiting...</div></div>
+    <div class="stat"><div class="stat-l">Verify</div><div class="stat-v" id="verifyVal" style="font-size:.75rem">—</div></div>
+  </div>
+</div>
 
-    <script type="module" crossorigin src="assets/index-DiWWjbeP.js"></script>
-    <link rel="modulepreload" crossorigin href="assets/rolldown-runtime-NVww-OeM.js">
-    <link rel="modulepreload" crossorigin href="assets/clsx-Bly0sbKO.js">
-    <link rel="modulepreload" crossorigin href="assets/jsx-runtime-CB_MmjBI.js">
-    <link rel="modulepreload" crossorigin href="assets/telemetry-vendor-DEGusmfN.js">
-    <link rel="modulepreload" crossorigin href="assets/react-BCdIJkyS.js">
-    <link rel="modulepreload" crossorigin href="assets/Box-CcAwjOc7.js">
-    <link rel="modulepreload" crossorigin href="assets/isFocusVisible-BmG9245y.js">
-    <link rel="modulepreload" crossorigin href="assets/Button-bI0kuEe8.js">
-    <link rel="modulepreload" crossorigin href="assets/ContentCopy-DFqaxABy.js">
-    <link rel="modulepreload" crossorigin href="assets/List-DwWTGI_w.js">
-    <link rel="modulepreload" crossorigin href="assets/react-dom-Ui7b7NBF.js">
-    <link rel="modulepreload" crossorigin href="assets/Grow-BcbIh5M5.js">
-    <link rel="modulepreload" crossorigin href="assets/Modal-CO5-Pjaf.js">
-    <link rel="modulepreload" crossorigin href="assets/TextField-BjYO-0gM.js">
-    <link rel="modulepreload" crossorigin href="assets/SwitchBase-D706KAKv.js">
-    <link rel="modulepreload" crossorigin href="assets/Checkbox-CyljtOyV.js">
-    <link rel="modulepreload" crossorigin href="assets/Tooltip-CmthPCA5.js">
-    <link rel="modulepreload" crossorigin href="assets/useMediaQuery-Cj0Opdbq.js">
-    <link rel="modulepreload" crossorigin href="assets/with-selector-CAdHgqho.js">
-    <link rel="modulepreload" crossorigin href="assets/pixi-vendor-CQTQJRGl.js">
-    <link rel="modulepreload" crossorigin href="assets/mockPrivy-DjzEnCJn.js">
-    <link rel="modulepreload" crossorigin href="assets/usePrivyConditional-D0bvSu0M.js">
-    <link rel="modulepreload" crossorigin href="assets/backendConfig-C9VlkkpQ.js">
-    <link rel="modulepreload" crossorigin href="assets/appStore-CsAYJ3Xl.js">
-    <link rel="modulepreload" crossorigin href="assets/classnames-C-ZnaMAW.js">
-    <link rel="modulepreload" crossorigin href="assets/fa-Bdtut4YV.js">
-    <link rel="modulepreload" crossorigin href="assets/useSocket-_EceTiMo.js">
-    <link rel="modulepreload" crossorigin href="assets/useSocketAuth-lOlmRorZ.js">
-    <link rel="modulepreload" crossorigin href="assets/AnniversaryEventContext-C-o3TjlO.js">
-    <link rel="modulepreload" crossorigin href="assets/exports-CCnEAut6.js">
-    <link rel="modulepreload" crossorigin href="assets/SoundContext-m65wS5Ok.js">
-    <link rel="modulepreload" crossorigin href="assets/Divider-DoKxuSk7.js">
-    <link rel="modulepreload" crossorigin href="assets/Chip-H7v9k7Hp.js">
-    <link rel="modulepreload" crossorigin href="assets/DialogTitle-B6HqFzlg.js">
-    <link rel="modulepreload" crossorigin href="assets/LinearProgress-BcRz2uZo.js">
-    <link rel="modulepreload" crossorigin href="assets/ListItem-1IixJTTb.js">
-    <link rel="modulepreload" crossorigin href="assets/opentelemetry-DMmG1OSR.js">
-    <link rel="modulepreload" crossorigin href="assets/socket-igZNVLzm.js">
-    <link rel="modulepreload" crossorigin href="assets/confetti.module-CF4bvL4k.js">
-    <link rel="modulepreload" crossorigin href="assets/Refresh-788-ALp9.js">
-    <link rel="modulepreload" crossorigin href="assets/LevelIcon-BD0kPrvx.js">
-    <link rel="modulepreload" crossorigin href="assets/developmentMonitoring-CunBBdRQ.js">
-    <link rel="modulepreload" crossorigin href="assets/formatUtils-DJIMI-4I.js">
-    <link rel="modulepreload" crossorigin href="assets/layers-DyuOUD5R.js">
-    <link rel="modulepreload" crossorigin href="assets/LevelBadge-Dv5GHQ9-.js">
-    <link rel="modulepreload" crossorigin href="assets/useMediaQuery-CkuO5pmR.js">
-    <link rel="modulepreload" crossorigin href="assets/useEquipmentPiggybankEarlyClaim.generated-DU7ApOKj.js">
-    <link rel="modulepreload" crossorigin href="assets/game.handlers-DPFScMhd.js">
-    <link rel="modulepreload" crossorigin href="assets/chunk-NL6KNZEE-BXk5YREK.js">
-    <link rel="modulepreload" crossorigin href="assets/api-CdwxGrKB.js">
-    <link rel="modulepreload" crossorigin href="assets/LazyPrivyProvider-BuwuKuAd.js">
-    <link rel="modulepreload" crossorigin href="assets/RestrictionActionButton-jppHu78N.js">
-    <link rel="modulepreload" crossorigin href="assets/useGameBearBullCrabGetGlobalHistory.generated-DlaXdXe6.js">
-    <link rel="modulepreload" crossorigin href="assets/useSocketConnection-DWo2Jbym.js">
-    <link rel="modulepreload" crossorigin href="assets/contexts-CV7S7n95.js">
-    <link rel="modulepreload" crossorigin href="assets/WalletContext-C1AN8Ghe.js">
-    <link rel="modulepreload" crossorigin href="assets/candleflipSlice.custom-CbiE9UFZ.js">
-    <link rel="modulepreload" crossorigin href="assets/devInboxMocks-odY_wZsc.js">
-    <link rel="modulepreload" crossorigin href="assets/UserMentionsDropdown.module-Dfv5Gxyx.js">
-    <link rel="modulepreload" crossorigin href="assets/useJackpotDisplay-BlihKkQh.js">
-    <link rel="modulepreload" crossorigin href="assets/useBonusClaimCode.generated-Cl90DxDD.js">
-    <link rel="modulepreload" crossorigin href="assets/useGameStandardAdminPatchStatus.generated-Boe1XRzG.js">
-    <link rel="modulepreload" crossorigin href="assets/useGameStandardTestGetState.generated-Dr93HXXO.js">
-    <link rel="modulepreload" crossorigin href="assets/useLivestreamEventListActive.generated-Bt8zqdKH.js">
-    <link rel="modulepreload" crossorigin href="assets/useReferralAdminSetFlags.generated-BKwcY03N.js">
-    <link rel="modulepreload" crossorigin href="assets/useReferralPartnerTipConfirm.generated-B_vPY3_M.js">
-    <link rel="modulepreload" crossorigin href="assets/useReferralPartnerTipPreview.generated-BMuLrKxg.js">
-    <link rel="modulepreload" crossorigin href="assets/hooks-BrkJEUbT.js">
-    <link rel="modulepreload" crossorigin href="assets/StreamerBanner-DkdzJllo.js">
-    <link rel="modulepreload" crossorigin href="assets/jackpotStatsStore-3Fn-fy9O.js">
-    <link rel="modulepreload" crossorigin href="assets/useSocketChatActions-DfONp46U.js">
-    <link rel="modulepreload" crossorigin href="assets/useSocketModActions-BsXa-lK8.js">
-    <link rel="modulepreload" crossorigin href="assets/useSocketReconnect-7d9XYoAo.js">
-    <link rel="modulepreload" crossorigin href="assets/balanceFormat-C_pc-FyO.js">
-    <link rel="stylesheet" crossorigin href="assets/AnniversaryEventContext-BeGm7RUe.css">
-    <link rel="stylesheet" crossorigin href="assets/game-BwR7DKnG.css">
-    <link rel="stylesheet" crossorigin href="assets/leaderboard-CjYcV_OO.css">
-    <link rel="stylesheet" crossorigin href="assets/RestrictionActionButton-OEPy4CIk.css">
-    <link rel="stylesheet" crossorigin href="assets/contexts-DgOLc8-v.css">
-    <link rel="stylesheet" crossorigin href="assets/UserMentionsDropdown-CcG5hPmh.css">
-    <link rel="stylesheet" crossorigin href="assets/StreamerBanner-BCR1ChZh.css">
-    <link rel="stylesheet" crossorigin href="assets/index-CC3trdiQ.css">
-  </head>
-  <body>
-    <!-- Theme detection script - disabled (no seasonal theme selection during initial load) -->
-    <script>
-      (function () {
-        /*
-        // Detect active theme (same logic as eventThemes.ts)
-        function getActiveTheme() {
-          // Check URL params for dev override
-          var urlParams = new URLSearchParams(window.location.search);
-          var devTheme = urlParams.get('dev_theme');
-          if (
-            devTheme &&
-            ['halloween', 'thanksgiving', 'christmas', 'default'].indexOf(devTheme) !== -1
-          ) {
-            return devTheme;
-          }
-          // Check localStorage for dev override
-          try {
-            var lsTheme = localStorage.getItem('DEV_THEME');
-            if (
-              lsTheme &&
-              ['halloween', 'thanksgiving', 'christmas', 'default'].indexOf(lsTheme) !== -1
-            ) {
-              return lsTheme;
-            }
-          } catch (e) {}
-          // Check date-based theme
-          var now = new Date();
-          var thanksgivingEnd = new Date('2025-12-01T00:00:00Z');
-          if (now < thanksgivingEnd) {
-            return 'thanksgiving';
-          }
-          var christmasEnd = new Date('2026-01-08T00:00:00Z');
-          if (now < christmasEnd) {
-            return 'christmas';
-          }
-          return 'default';
-        }
+<!-- Live Round -->
+<div class="card">
+  <div class="lbl">📈 Live Round</div>
+  <div class="live-top">
+    <div class="mult-box">
+      <div class="mult safe" id="mult">—</div>
+      <div><span class="phase ph-w" id="phase">⏳ Waiting</span></div>
+    </div>
+    <canvas id="liveChart" height="120"></canvas>
+  </div>
+</div>
 
-        var theme = getActiveTheme();
-        window.__initialTheme = theme;
-        window.__initialLogoUrl =
-          theme === 'default'
-            ? '/rugsfun_logo.png'
-            : theme === 'christmas'
-              ? '/rugsfun_combination_mark_beta_christmas.png'
-              : '/rugsfun_combination_mark_beta.png';
-        */
+<!-- Stats & History -->
+<div class="stats-row">
+  <div class="stat"><div class="stat-l">Avg Crash</div><div class="stat-v" id="sAvg">—</div></div>
+  <div class="stat"><div class="stat-l">Median</div><div class="stat-v" id="sMed">—</div></div>
+  <div class="stat"><div class="stat-l">Survived 2x</div><div class="stat-v" id="s2x" style="color:#4ade80">—</div></div>
+  <div class="stat"><div class="stat-l">Survived 5x</div><div class="stat-v" id="s5x" style="color:#fb923c">—</div></div>
+</div>
 
-        window.__initialTheme = 'default';
-        window.__initialLogoUrl = 'rugsfun_logo.png';
-      })();
-    </script>
+<div class="card">
+  <div class="lbl">History (newest first)</div>
+  <div class="hist" id="histGrid"><span style="color:#475569;font-size:.75rem">Waiting for data...</span></div>
+</div>
 
-<div id="root"></div>
-    <div id="modal-root"></div>
+<script>
+// ── Crash formula (your exact game code) ─────────────────────────────────
+const Q={RUG_PROB:.005,RUG_IMPACT:.98,DRIFT_MIN:-.02,DRIFT_MAX:.03,BIG_MOVE_CHANCE:.125,BIG_MOVE_MIN:.15,BIG_MOVE_MAX:.25,GOD_CANDLE:1e-5,GOD_MOVE:10};
+function isV7(id){return id&&id.length===36&&id[14]==='7';}
+function nxt(p,r){if(r()<Q.GOD_CANDLE&&p<=100)return p*Q.GOD_MOVE;let d;if(r()<Q.BIG_MOVE_CHANCE){const m=Q.BIG_MOVE_MIN+r()*(Q.BIG_MOVE_MAX-Q.BIG_MOVE_MIN);d=r()>.5?m:-m;}else{d=Q.DRIFT_MIN+r()*(Q.DRIFT_MAX-Q.DRIFT_MIN)+.005*Math.min(10,Math.sqrt(p))*(2*r()-1);}return Math.max(0,p*(1+d));}
+function calcCrash(seed,gameId){const s=isV7(gameId)?seed:seed+'-'+gameId;const r=new Math.seedrandom(s);let prices=[1],p=1,mn=1;for(let i=0;i<100000;i++){if(r()<Q.RUG_PROB||p<=0){prices.push(p<=0?0:mn*(1-Q.RUG_IMPACT));break;}p=nxt(p,r);if(p<mn)mn=p;prices.push(p);}const peak=Math.max(...prices);return{peak,tick:prices.length-1,prices};}
 
-    <!-- Loading screen removed: React mounts directly into #root -->
-    <script>
-      // No-ops so the app doesn't throw if it calls these
-      window.updateLoadingProgress = function() {};
-      window.hideInitialLoading = function() {};
-    </script>
-  <!-- Cloudflare Pages Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "8654f2873c6f4efd8adfdc2ae21240e0"}'></script><!-- Cloudflare Pages Analytics --></body>
+// ── DOM ───────────────────────────────────────────────────────────────────
+const $dot=document.getElementById('dot');
+const $lbl=document.getElementById('cLbl');
+const $mult=document.getElementById('mult');
+const $phase=document.getElementById('phase');
+const $peak=document.getElementById('peakVal');
+const $co=document.getElementById('cashoutVal');
+const $tick=document.getElementById('tickVal');
+const $ss=document.getElementById('seedStatus');
+const $ver=document.getElementById('verifyVal');
+const $grid=document.getElementById('histGrid');
+const $avg=document.getElementById('sAvg');
+const $med=document.getElementById('sMed');
+const $s2=document.getElementById('s2x');
+const $s5=document.getElementById('s5x');
+const $ai=document.getElementById('authInfo');
 
-<!-- Mirrored from rugs.fun/ by HTTrack Website Copier/3.x [XR&CO'2014], Tue, 16 Jun 2026 22:30:34 GMT -->
+// ── Chart ────────────────────────────────────────────────────────────────
+Chart.defaults.color='#475569';Chart.defaults.borderColor='#1e2030';
+const lc=document.getElementById('liveChart').getContext('2d');
+const liveChart=new Chart(lc,{type:'line',data:{labels:[],datasets:[{data:[],borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.07)',borderWidth:2,pointRadius:0,tension:.3,fill:true}]},options:{responsive:true,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:1,ticks:{callback:v=>v.toFixed(1)+'x'},grid:{color:'#1a1b26'}}}}});
+
+// ── State ────────────────────────────────────────────────────────────────
+let hist=[],live=[],cur=1;
+
+function median(a){if(!a.length)return 0;const s=[...a].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function pct(n,t){return t?Math.round(n/t*100)+'%':'—';}
+function hcls(m){if(m<1.5)return 'h hr';if(m<2)return 'h ho';if(m<3)return 'h hy';if(m<5)return 'h hg';return 'h hb';}
+function mcls(m){return m<2?'mult hot':m<3?'mult warn':'mult safe';}
+
+function setPhase(ph){
+  const map={round:['ph-r','🟢 LIVE'],pre:['ph-p','🔵 Betting'],crash:['ph-c','💥 CRASHED'],wait:['ph-w','⏳ Waiting']};
+  const[c,l]=map[ph]||map.wait;
+  $phase.className='phase '+c;$phase.textContent=l;
+  if(ph==='pre'||ph==='wait'){$mult.textContent='—';$mult.className='mult safe';}
+}
+
+function pushLive(v){
+  cur=v;live.push(v);if(live.length>300)live.shift();
+  const c=v<2?'#ef4444':v<3?'#f59e0b':'#22c55e';
+  liveChart.data.datasets[0].borderColor=c;liveChart.data.datasets[0].backgroundColor=c+'10';
+  liveChart.data.labels=live.map((_,i)=>i);liveChart.data.datasets[0].data=live;
+  liveChart.options.scales.y.min=Math.max(.9,Math.min(...live)-.05);liveChart.update('none');
+  $mult.textContent=v.toFixed(2)+'x';$mult.className=mcls(v);
+}
+
+function showSeed(seed,gameId){
+  try{
+    const r=calcCrash(seed,gameId);
+    $peak.textContent=r.peak.toFixed(3)+'x';
+    $co.textContent=(r.peak*.95).toFixed(2)+'x';
+    $tick.textContent=r.tick;
+    $ss.textContent='✅ Ready';$ss.style.color='#22c55e';
+  }catch(e){$ss.textContent='Error: '+e.message;$ss.style.color='#ef4444';}
+}
+
+function addCrash(m,id){
+  hist.push({m,id});if(hist.length>200)hist.shift();
+  rebuildHist();updateStats();
+}
+
+function rebuildHist(){
+  $grid.innerHTML='';
+  if(!hist.length){$grid.innerHTML='<span style="color:#475569;font-size:.75rem">Waiting...</span>';return;}
+  [...hist].reverse().forEach(h=>{const el=document.createElement('span');el.className=hcls(h.m);el.textContent=h.m.toFixed(2)+'x';$grid.appendChild(el);});
+}
+
+function updateStats(){
+  const v=hist.map(h=>h.m);if(!v.length)return;
+  const n=v.length,a=v.reduce((s,x)=>s+x,0)/n;
+  $avg.textContent=a.toFixed(2)+'x';$med.textContent=median(v).toFixed(2)+'x';
+  $s2.textContent=pct(v.filter(x=>x>=2).length,n);$s5.textContent=pct(v.filter(x=>x>=5).length,n);
+}
+
+function processHistory(arr){
+  if(!Array.isArray(arr))return;
+  const ids=new Set(hist.map(h=>h.id));
+  arr.forEach(g=>{const m=parseFloat((g.peakMultiplier||g.price||1).toFixed(4));if(!ids.has(g.id)&&m>0){hist.push({m,id:g.id});ids.add(g.id);}});
+  hist.sort((a,b)=>(a.t||0)-(b.t||0));if(hist.length>200)hist.splice(0,hist.length-200);
+  rebuildHist();updateStats();
+}
+
+// ── Socket ───────────────────────────────────────────────────────────────
+let socket=null;
+function getToken(){try{const t=localStorage.getItem('privy:token');return t&&t.startsWith('"')?JSON.parse(t):t;}catch{return null;}}
+
+function connect(){
+  const manual=document.getElementById('tkIn').value.trim();
+  const token=manual||getToken();
+  if(token&&!manual)document.getElementById('tkIn').value=token.slice(0,30)+'...';
+  if(socket)socket.disconnect();
+  socket=io('https://backend.rugs.fun',{transports:['websocket','polling']});
+
+  socket.on('connect',()=>{
+    $dot.className='dot on';$lbl.textContent='Connected';
+    if(token){
+      socket.emit('authenticate',{token},()=>{$ai.textContent='Authenticated ✓';});
+    }
+    // Get game state for seed prediction
+    socket.emit('game:standard:test:getState',{},(s)=>{
+      if(s?.serverSeed){showSeed(s.serverSeed,s.gameId||s.id);}
+    });
+    socket.emit('game:standard:getGlobalHistory',{},(d)=>{if(d&&Array.isArray(d))processHistory(d);});
+  });
+
+  socket.on('disconnect',()=>{$dot.className='dot';$lbl.textContent='Disconnected';});
+  socket.on('connect_error',(e)=>{$dot.className='dot';$lbl.textContent='CORS — use rugs.fun domain';});
+
+  socket.on('game:standard:stats',(d)=>{
+    if(d?.gameHistory)processHistory(d.gameHistory);
+    // Verify formula on past round
+    if(d?.gameHistory?.length){
+      const last=d.gameHistory[0];
+      if(last?.serverSeed){
+        const r=calcCrash(last.serverSeed,last.id);
+        const actual=parseFloat(last.peakMultiplier||0);
+        const match=Math.abs(r.peak-actual)<0.01;
+        $ver.textContent=match?'✅ Accurate':'~'+r.peak.toFixed(2)+'x';
+        $ver.style.color=match?'#22c55e':'#f59e0b';
+      }
+    }
+  });
+
+  socket.on('game:standard:phase',(d)=>{
+    if(!d)return;
+    if(d.phase==='round'){
+      setPhase('round');live=[];liveChart.data.labels=[];liveChart.data.datasets[0].data=[];liveChart.update('none');
+      if(d.prices?.length)d.prices.forEach(p=>pushLive(p));
+    } else if(d.phase==='crash'){
+      const m=typeof d.price==='number'?d.price:cur;
+      $mult.textContent=m.toFixed(2)+'x';$mult.className='mult crash';
+      setPhase('crash');addCrash(m,d.gameId);
+      setTimeout(()=>{live=[];liveChart.data.labels=[];liveChart.data.datasets[0].data=[];liveChart.update('none');},2500);
+      // Pre-fetch next round seed
+      setTimeout(()=>{socket.emit('game:standard:test:getState',{},(s)=>{if(s?.serverSeed)showSeed(s.serverSeed,s.gameId||d.gameId);});},500);
+    } else if(d.phase==='preround'){
+      setPhase('pre');
+      setTimeout(()=>{socket.emit('game:standard:test:getState',{},(s)=>{if(s?.serverSeed)showSeed(s.serverSeed,s.gameId);});},300);
+    }
+  });
+
+  socket.on('game:standard:tick',(d)=>{if(d?.p){const v=d.p[d.p.length-1];if(typeof v==='number')pushLive(v);}});
+}
+
+window.addEventListener('load',()=>{connect();});
+</script>
+</body>
 </html>
