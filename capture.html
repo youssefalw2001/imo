@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Auth Capture</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0e15;color:#e2e8f0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;text-align:center}
+.box{max-width:400px;width:100%}
+h2{color:#ffc700;font-size:1.4rem;margin-bottom:8px}
+.sub{color:#64748b;font-size:.82rem;margin-bottom:24px;line-height:1.5}
+.card{background:#15161d;border:1px solid #1e2030;border-radius:14px;padding:22px;margin-bottom:16px}
+.status{font-size:1rem;font-weight:700;padding:14px 20px;border-radius:10px;margin-top:8px}
+.wait{background:#1e203022;color:#64748b;border:1px solid #47506633}
+.ok{background:#14532d22;color:#22c55e;border:1px solid #22c55e44}
+.err{background:#7f1d1d22;color:#ef4444;border:1px solid #ef444444}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid #ffc700;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.link{color:#60a5fa;font-size:.75rem;margin-top:10px;word-break:break-all}
+input{width:100%;background:#0d0e15;border:1px solid #1e2030;border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:.8rem;margin-top:10px;outline:none}
+input:focus{border-color:#ffc700}
+button{background:#ffc700;color:#0d0e15;border:none;border-radius:8px;padding:10px 20px;font-weight:800;font-size:.85rem;cursor:pointer;width:100%;margin-top:10px}
+button:hover{background:#ffd700}
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>🔑 Auth Capture</h2>
+  <p class="sub">Sends your session token to the predictor server.<br>Must be opened while logged into rugs.fun.</p>
+
+  <div class="card">
+    <div id="status" class="status wait"><span class="spinner"></span>Reading session...</div>
+    <div class="link" id="info"></div>
+  </div>
+
+  <!-- Fallback: manual predictor URL input -->
+  <div class="card" id="manualBox" style="display:none">
+    <div style="font-size:.75rem;color:#64748b;margin-bottom:8px">Enter your predictor URL if auto-send fails:</div>
+    <input id="urlInput" placeholder="https://your-predictor.onrender.com" />
+    <button onclick="trySend()">Send Token</button>
+  </div>
+</div>
+
+<script>
+// Auto-detect predictor URL from referrer or use stored URL
+var PREDICTOR_URL = localStorage.getItem('predictor_url') || '';
+
+function getToken() {
+  try {
+    var raw = localStorage.getItem('privy:token');
+    if (!raw) return null;
+    return raw.startsWith('"') ? JSON.parse(raw) : raw;
+  } catch(e) { return null; }
+}
+
+function setStatus(msg, type) {
+  var el = document.getElementById('status');
+  el.className = 'status ' + type;
+  el.innerHTML = type === 'wait' ? '<span class="spinner"></span>' + msg : msg;
+}
+
+function setInfo(msg) {
+  document.getElementById('info').textContent = msg;
+}
+
+function sendToken(url, token) {
+  return fetch(url + '/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token })
+  }).then(function(r) { return r.json(); });
+}
+
+function trySend() {
+  var url = document.getElementById('urlInput').value.trim().replace(/\/$/, '');
+  if (!url) { setStatus('❌ Enter your predictor URL', 'err'); return; }
+  localStorage.setItem('predictor_url', url);
+  PREDICTOR_URL = url;
+  var token = getToken();
+  if (!token) { setStatus('❌ Not logged in — log into rugs.fun first', 'err'); return; }
+  setStatus('Sending...', 'wait');
+  sendToken(url, token)
+    .then(function(d) {
+      if (d.ok) {
+        setStatus('✅ Token sent! Open the predictor dashboard — predictions are now active.', 'ok');
+        setInfo('Token length: ' + token.length + ' chars');
+      } else {
+        setStatus('❌ Server rejected token', 'err');
+      }
+    })
+    .catch(function(e) {
+      setStatus('❌ Could not reach predictor server', 'err');
+      setInfo(e.message);
+    });
+}
+
+// Auto-run on load
+(function() {
+  var token = getToken();
+
+  if (!token) {
+    setStatus('❌ No session found — log into rugs.fun first, then return here', 'err');
+    document.getElementById('manualBox').style.display = 'block';
+    return;
+  }
+
+  setInfo('Session found (' + token.length + ' chars)');
+
+  if (!PREDICTOR_URL) {
+    setStatus('Enter your predictor URL below', 'wait');
+    document.getElementById('manualBox').style.display = 'block';
+    document.getElementById('urlInput').value = '';
+    return;
+  }
+
+  // Auto-send
+  setStatus('Sending token to predictor...', 'wait');
+  sendToken(PREDICTOR_URL, token)
+    .then(function(d) {
+      if (d.ok) {
+        setStatus('✅ Done! Predictions now active on the dashboard.', 'ok');
+        setInfo('Predictor: ' + PREDICTOR_URL);
+      } else {
+        setStatus('Server error — enter URL manually', 'err');
+        document.getElementById('manualBox').style.display = 'block';
+      }
+    })
+    .catch(function() {
+      setStatus('Could not reach predictor — enter URL below', 'err');
+      document.getElementById('manualBox').style.display = 'block';
+      if (PREDICTOR_URL) document.getElementById('urlInput').value = PREDICTOR_URL;
+    });
+})();
+</script>
+</body>
+</html>
