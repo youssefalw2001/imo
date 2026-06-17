@@ -2,5 +2,5 @@ name = "rugs-token-capture"
 main = "index.js"
 compatibility_date = "2024-01-01"
 
-# Route is added manually in Cloudflare dashboard after first deploy
-# Workers > rugs-token-capture > Routes > Add route: backend.rugs.fun/*
+# Deployed as workers.dev endpoint - no zone/route needed
+# URL will be: rugs-token-capture.<subdomain>.workers.dev

