@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Seed Calculator</title>
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0e15;color:#e2e8f0;font-family:'Segoe UI',monospace,sans-serif;padding:20px;max-width:700px;margin:0 auto}
+h1{color:#ffc700;font-size:1.3rem;margin-bottom:6px}
+.sub{color:#475569;font-size:.8rem;margin-bottom:24px}
+.card{background:#15161d;border:1px solid #23243a;border-radius:12px;padding:20px;margin-bottom:16px}
+.lbl{font-size:.65rem;text-transform:uppercase;letter-spacing:2px;color:#475569;margin-bottom:8px}
+.big{font-size:3rem;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;margin:8px 0}
+.green{color:#22c55e;text-shadow:0 0 30px #22c55e44}
+.red{color:#ef4444;text-shadow:0 0 30px #ef444444}
+.gold{color:#ffc700}
+.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px}
+.stat{background:#0d0e15;border-radius:8px;padding:10px 12px}
+.stat-l{font-size:.6rem;color:#475569;text-transform:uppercase;letter-spacing:1px}
+.stat-v{font-size:1.1rem;font-weight:800;margin-top:2px}
+.badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.b-live{background:#16a34a22;color:#22c55e;border:1px solid #22c55e44}
+.b-wait{background:#1d4ed822;color:#60a5fa;border:1px solid #3b82f644}
+.b-err{background:#7f1d1d22;color:#ef4444;border:1px solid #ef444444}
+.conn{display:flex;align-items:center;gap:8px;font-size:.75rem}
+.dot{width:8px;height:8px;border-radius:50%;background:#ef4444}
+.dot.on{background:#22c55e;box-shadow:0 0 6px #22c55e}
+input{width:100%;background:#0d0e15;border:1px solid #23243a;border-radius:8px;padding:10px 12px;color:#e2e8f0;font-family:monospace;font-size:.8rem;margin-bottom:8px;outline:none}
+input:focus{border-color:#ffc700}
+button{background:#ffc700;color:#0d0e15;border:none;border-radius:8px;padding:10px 20px;font-weight:800;font-size:.85rem;cursor:pointer;width:100%}
+button:hover{background:#ffd700}
+.log{background:#0a0b0f;border:1px solid #1a1b26;border-radius:8px;padding:10px;font-size:.7rem;color:#475569;height:100px;overflow-y:auto;font-family:monospace;margin-top:12px}
+.warn{background:#78350f22;border:1px solid #f59e0b44;border-radius:8px;padding:12px 16px;font-size:.78rem;color:#fbbf24;margin-bottom:16px}
+</style>
+</head>
+<body>
+<h1>🎯 Seed Calculator</h1>
+<p class="sub">Uses your serverSeed to calculate the EXACT crash point before betting opens</p>
+
+<div class="warn">⚠️ This only works when accessed from <b>rugs.fun</b> or after adding your Render URL to backend CORS. Open this page at <b>rugs.fun/seed_calc.html</b> for best results.</div>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div class="lbl">Socket Connection</div>
+    <div class="conn"><div class="dot" id="dot"></div><span id="cLbl">Connecting...</span></div>
+  </div>
+  <div class="lbl">Auth Token (auto-loaded from localStorage)</div>
+  <input id="tokenInput" placeholder="Paste your Privy JWT token if not auto-loaded..." />
+  <button onclick="tryConnect()">Connect & Authenticate</button>
+</div>
+
+<div class="card" id="resultCard">
+  <div class="lbl">Next Round Prediction</div>
+  <div id="badge" class="badge b-wait">⏳ Waiting for seed...</div>
+  <div class="big gold" id="prediction">—</div>
+  <div style="color:#64748b;font-size:.75rem;margin-top:4px">Predicted crash / peak multiplier</div>
+  <div class="row">
+    <div class="stat"><div class="stat-l">Crash Tick</div><div class="stat-v gold" id="sTick">—</div></div>
+    <div class="stat"><div class="stat-l">Peak</div><div class="stat-v green" id="sPeak">—</div></div>
+    <div class="stat"><div class="stat-l">Game ID</div><div class="stat-v" id="sId" style="font-size:.7rem;color:#64748b">—</div></div>
+  </div>
+  <div style="margin-top:14px;background:#0d0e15;border-radius:8px;padding:12px">
+    <div class="stat-l" style="margin-bottom:6px">🎯 Recommended cashout</div>
+    <div style="font-size:1.4rem;font-weight:800;color:#ffc700" id="rec">—</div>
+    <div style="font-size:.65rem;color:#475569;margin-top:4px">95% of peak to guarantee exit before crash</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="lbl">Manual Seed Calculator</div>
+  <input id="seedIn" placeholder="Server Seed" />
+  <input id="gameIn" placeholder="Game ID" />
+  <button onclick="calcManual()">Calculate Crash Point</button>
+  <div id="manualResult" style="margin-top:12px;font-size:1rem;font-weight:700;color:#ffc700"></div>
+</div>
+
+<div class="card">
+  <div class="lbl">Event Log</div>
+  <div class="log" id="log"></div>
+</div>
+
+<script>
+// ── Crash formula (extracted from your game's appStore.js) ──────────────────
+const RUG_PROB       = 0.005;
+const RUG_IMPACT     = 0.98;
+const DRIFT_MIN      = -0.02;
+const DRIFT_MAX      = 0.03;
+const BIG_MOVE_CHANCE= 0.125;
+const BIG_MOVE_MIN   = 0.15;
+const BIG_MOVE_MAX   = 0.25;
+const GOD_CANDLE     = 1e-5;
+const GOD_MOVE       = 10;
+
+function isUUIDv7(id) {
+  return id && id.length === 36 && id[14] === '7';
+}
+
+function nextPrice(price, rng) {
+  if (rng() < GOD_CANDLE && price <= 100) return price * GOD_MOVE;
+  let drift;
+  if (rng() < BIG_MOVE_CHANCE) {
+    const mag = BIG_MOVE_MIN + rng() * (BIG_MOVE_MAX - BIG_MOVE_MIN);
+    drift = rng() > 0.5 ? mag : -mag;
+  } else {
+    drift = DRIFT_MIN + rng() * (DRIFT_MAX - DRIFT_MIN) + 0.005 * Math.min(10, Math.sqrt(price)) * (2 * rng() - 1);
+  }
+  return Math.max(0, price * (1 + drift));
+}
+
+function calcCrash(serverSeed, gameId) {
+  const seedStr = isUUIDv7(gameId) ? serverSeed : serverSeed + '-' + gameId;
+  const rng = new Math.seedrandom(seedStr);
+  let prices = [1], price = 1, minPrice = 1;
+  for (let i = 0; i < 100000; i++) {
+    if (rng() < RUG_PROB || price <= 0) {
+      const ruggedPrice = price <= 0 ? 0 : minPrice * (1 - RUG_IMPACT);
+      prices.push(ruggedPrice);
+      break;
+    }
+    price = nextPrice(price, rng);
+    if (price < minPrice) minPrice = price;
+    prices.push(price);
+  }
+  const peak = Math.max(...prices);
+  const crashTick = prices.length - 1;
+  const crashPrice = prices[prices.length - 1];
+  return { prices, peak, crashTick, crashPrice };
+}
+
+// ── Logging ─────────────────────────────────────────────────────────────────
+const $log = document.getElementById('log');
+function log(msg, color = '#475569') {
+  const d = document.createElement('div');
+  d.style.color = color;
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  $log.prepend(d);
+  while ($log.children.length > 50) $log.removeChild($log.lastChild);
+}
+
+// ── UI update ────────────────────────────────────────────────────────────────
+function showResult(serverSeed, gameId) {
+  try {
+    const r = calcCrash(serverSeed, gameId);
+    const peak = r.peak.toFixed(3);
+    const rec = (r.peak * 0.95).toFixed(2);
+    document.getElementById('prediction').textContent = peak + 'x';
+    document.getElementById('sPeak').textContent = peak + 'x';
+    document.getElementById('sTick').textContent = r.crashTick;
+    document.getElementById('sId').textContent = gameId ? gameId.slice(0,8)+'...' : '—';
+    document.getElementById('rec').textContent = rec + 'x';
+    const badge = document.getElementById('badge');
+    badge.className = 'badge b-live';
+    badge.textContent = '✅ Seed calculated';
+    log(`Crash at tick ${r.crashTick}, peak=${peak}x, cashout at ${rec}x`, '#22c55e');
+  } catch(e) {
+    log('Calc error: ' + e.message, '#ef4444');
+  }
+}
+
+// ── Socket ───────────────────────────────────────────────────────────────────
+let socket = null;
+
+function tryConnect() {
+  const manualToken = document.getElementById('tokenInput').value.trim();
+  const autoToken = (() => { try { const t = localStorage.getItem('privy:token'); return t && t.startsWith('"') ? JSON.parse(t) : t; } catch(e) { return null; } })();
+  const token = manualToken || autoToken;
+  if (token && !manualToken) { document.getElementById('tokenInput').value = token.slice(0,40) + '...'; }
+  if (socket) { socket.disconnect(); }
+  socket = io('https://backend.rugs.fun', { transports: ['websocket', 'polling'] });
+  socket.on('connect', () => {
+    document.getElementById('dot').className = 'dot on';
+    document.getElementById('cLbl').textContent = 'Connected';
+    log('Connected to backend', '#22c55e');
+    if (token) {
+      socket.emit('authenticate', { token }, (res) => {
+        log('Auth: ' + JSON.stringify(res || 'sent'), '#ffc700');
+      });
+    }
+    // Try to get current game state including seed
+    socket.emit('game:standard:test:getState', {}, (state) => {
+      log('test:getState response: ' + JSON.stringify(state || 'no callback').slice(0, 200), '#60a5fa');
+      if (state && state.serverSeed) {
+        showResult(state.serverSeed, state.gameId || state.id);
+      }
+    });
+  });
+  socket.on('disconnect', () => { document.getElementById('dot').className = 'dot'; document.getElementById('cLbl').textContent = 'Disconnected'; });
+  socket.on('connect_error', (e) => { document.getElementById('cLbl').textContent = 'CORS Error'; log('Connection error: ' + e.message, '#ef4444'); });
+
+  // Listen for phase events to catch seed at round start
+  socket.on('game:standard:phase', (d) => {
+    log('Phase: ' + d?.phase + (d?.gameId ? ' id='+d.gameId.slice(0,8) : ''), '#94a3b8');
+    if (d?.phase === 'preround') {
+      // Request state when betting opens (seed should be set)
+      setTimeout(() => {
+        socket.emit('game:standard:test:getState', {}, (state) => {
+          log('getState on preround: ' + JSON.stringify(state || 'empty').slice(0,200), '#60a5fa');
+          if (state?.serverSeed) showResult(state.serverSeed, state.gameId || d.gameId);
+        });
+      }, 200);
+    }
+  });
+
+  // Also listen for standard stats which contains serverSeed of past rounds (for testing)
+  socket.on('game:standard:stats', (d) => {
+    if (d?.gameHistory?.length) {
+      const last = d.gameHistory[0];
+      if (last?.serverSeed) {
+        log('Got serverSeed from history (past round test): ' + last.serverSeed.slice(0,16) + '...', '#f59e0b');
+        // Verify formula works: calculate and compare to actual
+        const r = calcCrash(last.serverSeed, last.id);
+        const actual = last.peakMultiplier?.toFixed(3) || '?';
+        log(`Verify: calculated peak=${r.peak.toFixed(3)}x, actual=${actual}x`, r.peak.toFixed(1) === parseFloat(actual).toFixed(1) ? '#22c55e' : '#f59e0b');
+      }
+    }
+  });
+}
+
+// ── Manual calc ──────────────────────────────────────────────────────────────
+function calcManual() {
+  const seed = document.getElementById('seedIn').value.trim();
+  const gameId = document.getElementById('gameIn').value.trim();
+  if (!seed) { alert('Enter a server seed'); return; }
+  const r = calcCrash(seed, gameId);
+  document.getElementById('manualResult').textContent =
+    `Peak: ${r.peak.toFixed(4)}x | Crash tick: ${r.crashTick} | Recommended cashout: ${(r.peak * 0.95).toFixed(2)}x`;
+  log(`Manual calc: seed=${seed.slice(0,12)}... → peak=${r.peak.toFixed(4)}x tick=${r.crashTick}`, '#ffc700');
+}
+
+// ── Auto-connect on load ─────────────────────────────────────────────────────
+window.addEventListener('load', () => { tryConnect(); });
+</script>
+</body>
+</html>
