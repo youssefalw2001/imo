@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Rugs Analyzer</title>
+<link rel="icon" href="favicon.ico"/>
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0..1,0..200" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#15161d;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;padding:16px;max-width:1200px;margin:0 auto}
+a{color:inherit;text-decoration:none}
+/* Header */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 0 16px;border-bottom:1px solid #23243a;margin-bottom:20px}
+.hdr-logo{font-size:1.2rem;font-weight:900;color:#ffc700;letter-spacing:1px}
+.conn{display:flex;align-items:center;gap:8px;padding:5px 14px;border-radius:20px;background:#1a1b26;border:1px solid #23243a;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.dot{width:8px;height:8px;border-radius:50%;background:#ef4444;transition:all .3s}
+.dot.on{background:#22c55e;box-shadow:0 0 8px #22c55e}
+.dot.warn{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
+/* Status banner shown on CORS error */
+.banner{background:#1a1b26;border:1px solid #f59e0b44;border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:.8rem;color:#fbbf24;display:none;gap:10px;align-items:flex-start}
+.banner.show{display:flex}
+.banner b{color:#ffc700}
+/* Top grid */
+.top{display:grid;grid-template-columns:220px 1fr;gap:16px;margin-bottom:16px}
+/* Card */
+.card{background:#1a1b26;border:1px solid #23243a;border-radius:14px;padding:18px}
+.card-label{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#475569;margin-bottom:14px}
+/* Multiplier */
+.mult-wrap{text-align:center;padding:12px 0}
+.mult{font-size:3.5rem;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;transition:color .15s}
+.mult.safe{color:#22c55e;text-shadow:0 0 30px #22c55e44}
+.mult.warn{color:#f59e0b;text-shadow:0 0 30px #f59e0b44}
+.mult.hot{color:#ef4444;text-shadow:0 0 30px #ef444444}
+.mult.crash{color:#ef4444;text-shadow:0 0 50px #ef444499;animation:pulse .4s ease}
+@keyframes pulse{0%{transform:scale(1.2)}100%{transform:scale(1)}}
+.phase{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:4px 14px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.ph-round{background:#16a34a22;color:#22c55e;border:1px solid #22c55e44}
+.ph-pre{background:#1d4ed822;color:#60a5fa;border:1px solid #3b82f644}
+.ph-crash{background:#7f1d1d22;color:#ef4444;border:1px solid #ef444444}
+.ph-wait{background:#1e203022;color:#64748b;border:1px solid #47506644}
+/* Danger bar */
+.d-section{margin-top:16px}
+.d-row{display:flex;justify-content:space-between;font-size:.72rem;color:#94a3b8;margin-bottom:6px}
+.d-row span:last-child{font-weight:800;color:#e2e8f0}
+.d-track{width:100%;height:8px;background:#23243a;border-radius:4px;overflow:hidden}
+.d-fill{height:100%;border-radius:4px;background:linear-gradient(to right,#22c55e,#f59e0b,#ef4444);transition:width .4s}
+.d-hint{font-size:.6rem;color:#475569;margin-top:5px}
+/* Stats */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat-box{background:#13141c;border-radius:10px;padding:10px 12px}
+.stat-lbl{font-size:.6rem;text-transform:uppercase;letter-spacing:1px;color:#475569;margin-bottom:3px}
+.stat-val{font-size:1.2rem;font-weight:800;color:#ffc700}
+.surv-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.surv-box{background:#13141c;border-radius:10px;padding:8px;text-align:center}
+.surv-lbl{font-size:.6rem;color:#475569;margin-bottom:3px}
+.surv-val{font-size:.95rem;font-weight:800}
+/* Charts */
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+/* History */
+.hist-wrap{display:flex;flex-wrap:wrap;gap:6px;max-height:130px;overflow-y:auto}
+.h-item{padding:4px 9px;border-radius:6px;font-size:.72rem;font-weight:700;cursor:default}
+.h-red   {background:#7f1d1d33;color:#f87171;border:1px solid #ef444433}
+.h-orange{background:#78350f33;color:#fb923c;border:1px solid #f9731633}
+.h-yellow{background:#71350033;color:#fbbf24;border:1px solid #f59e0b33}
+.h-green {background:#14532d33;color:#4ade80;border:1px solid #22c55e33}
+.h-blue  {background:#1e3a5f33;color:#60a5fa;border:1px solid #3b82f633}
+.h-empty{font-size:.78rem;color:#475569}
+/* Waiting overlay */
+.wait-msg{text-align:center;padding:30px;color:#475569;font-size:.85rem}
+/* Responsive */
+@media(max-width:700px){.top{grid-template-columns:1fr}.charts{grid-template-columns:1fr}.surv-row{grid-template-columns:repeat(2,1fr)}.mult{font-size:2.8rem}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-logo">📈 Rugs Analyzer</div>
+  <div class="conn"><div class="dot" id="dot"></div><span id="connLbl">Connecting...</span></div>
+</div>
+
+<div class="banner" id="banner">
+  <span style="font-size:1.2rem">⚠️</span>
+  <div><b>CORS blocked</b> — your backend only allows connections from <b>rugs.fun</b>. To use this analyzer, either:<br>
+  1. Visit this page while on <b>rugs.fun</b> domain, or<br>
+  2. Add <b>imo-7bue.onrender.com</b> to your backend's CORS allowed origins.</div>
+</div>
+
+<div class="top">
+  <div class="card">
+    <div class="card-label">Live Round</div>
+    <div class="mult-wrap">
+      <div class="mult safe" id="mult">—</div>
+      <div><span class="phase ph-wait" id="phase">⏳ Waiting</span></div>
+    </div>
+    <div class="d-section">
+      <div class="d-row"><span>Crash Probability</span><span id="dPct">—</span></div>
+      <div class="d-track"><div class="d-fill" id="dFill" style="width:0%"></div></div>
+      <div class="d-hint">% of past rounds that crashed here or earlier</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-label">Stats — <span id="sampleN">0</span> rounds</div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-lbl">Avg Crash</div><div class="stat-val" id="sAvg">—</div></div>
+      <div class="stat-box"><div class="stat-lbl">Median</div><div class="stat-val" id="sMed">—</div></div>
+      <div class="stat-box"><div class="stat-lbl">Lowest</div><div class="stat-val" id="sMin">—</div></div>
+      <div class="stat-box"><div class="stat-lbl">Highest</div><div class="stat-val" id="sMax">—</div></div>
+    </div>
+    <div class="surv-row">
+      <div class="surv-box"><div class="surv-lbl">Past 2x</div><div class="surv-val" id="sv2" style="color:#4ade80">—</div></div>
+      <div class="surv-box"><div class="surv-lbl">Past 3x</div><div class="surv-val" id="sv3" style="color:#fbbf24">—</div></div>
+      <div class="surv-box"><div class="surv-lbl">Past 5x</div><div class="surv-val" id="sv5" style="color:#fb923c">—</div></div>
+      <div class="surv-box"><div class="surv-lbl">Past 10x</div><div class="surv-val" id="sv10" style="color:#f87171">—</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="charts">
+  <div class="card"><div class="card-label">Live Round</div><canvas id="liveChart" height="160"></canvas></div>
+  <div class="card"><div class="card-label">Crash Distribution — <span id="histN">0</span> rounds</div><canvas id="histChart" height="160"></canvas></div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-label">History (newest first)</div>
+  <div class="hist-wrap" id="histGrid"><div class="h-empty">Waiting for data...</div></div>
+</div>
+
+<script>
+const BACKEND='https://backend.rugs.fun';
+let history=[],livePoints=[],curMult=1,curPhase='wait';
+
+// DOM
+const $mult=document.getElementById('mult');
+const $phase=document.getElementById('phase');
+const $dPct=document.getElementById('dPct');
+const $dFill=document.getElementById('dFill');
+const $dot=document.getElementById('dot');
+const $lbl=document.getElementById('connLbl');
+const $grid=document.getElementById('histGrid');
+const $sN=document.getElementById('sampleN');
+const $hN=document.getElementById('histN');
+const $avg=document.getElementById('sAvg');
+const $med=document.getElementById('sMed');
+const $min=document.getElementById('sMin');
+const $max=document.getElementById('sMax');
+const $sv2=document.getElementById('sv2');
+const $sv3=document.getElementById('sv3');
+const $sv5=document.getElementById('sv5');
+const $sv10=document.getElementById('sv10');
+const $banner=document.getElementById('banner');
+
+// Charts
+Chart.defaults.color='#475569';Chart.defaults.borderColor='#23243a';
+const liveCtx=document.getElementById('liveChart').getContext('2d');
+const liveChart=new Chart(liveCtx,{type:'line',data:{labels:[],datasets:[{data:[],borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.07)',borderWidth:2,pointRadius:0,tension:.3,fill:true}]},options:{responsive:true,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:1,ticks:{callback:v=>v.toFixed(2)+'x'},grid:{color:'#1e1f2e'}}}}});
+const BUCKETS=['<1.5x','1.5–2x','2–3x','3–5x','5–10x','10x+'];
+const BCOLORS=['#ef444499','#f9731699','#f59e0b99','#84cc1699','#22c55e99','#60a5fa99'];
+const histCtx=document.getElementById('histChart').getContext('2d');
+const histChart=new Chart(histCtx,{type:'bar',data:{labels:BUCKETS,datasets:[{data:[0,0,0,0,0,0],backgroundColor:BCOLORS,borderRadius:4}]},options:{responsive:true,animation:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{ticks:{precision:0},grid:{color:'#1e1f2e'}}}}});
+
+function bucketIdx(m){if(m<1.5)return 0;if(m<2)return 1;if(m<3)return 2;if(m<5)return 3;if(m<10)return 4;return 5;}
+function median(arr){if(!arr.length)return 0;const s=[...arr].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function pct(n,t){return t?Math.round(n/t*100)+'%':'—';}
+function hClass(m){if(m<1.5)return 'h-red';if(m<2)return 'h-orange';if(m<3)return 'h-yellow';if(m<5)return 'h-green';if(m<10)return 'h-blue';return 'h-blue';}
+function multClass(m){if(m<2)return 'hot';if(m<3)return 'warn';return 'safe';}
+
+function setPhase(ph,m){
+  curPhase=ph;
+  const map={round:['ph-round','🟢 LIVE'],pre:['ph-pre','🔵 Betting'],crash:['ph-crash','💥 CRASHED'],wait:['ph-wait','⏳ Waiting']};
+  const[cls,lbl]=map[ph]||map.wait;
+  $phase.className='phase '+cls;$phase.textContent=lbl;
+  if(ph==='pre'||ph==='wait'){$mult.textContent='—';$mult.className='mult safe';}
+  else if(ph==='crash'){$mult.textContent=(m||curMult).toFixed(2)+'x';$mult.className='mult crash';}
+}
+
+function updateDanger(m){
+  const vals=history.map(h=>h.m);if(!vals.length){$dPct.textContent='—';$dFill.style.width='0%';return;}
+  const p=Math.round(vals.filter(v=>v<=m).length/vals.length*100);
+  $dPct.textContent=p+'%';$dFill.style.width=p+'%';
+}
+
+function pushLive(val){
+  curMult=val;livePoints.push(val);if(livePoints.length>400)livePoints.shift();
+  const c=val<2?'#ef4444':val<3?'#f59e0b':'#22c55e';
+  liveChart.data.datasets[0].borderColor=c;liveChart.data.datasets[0].backgroundColor=c+'15';
+  liveChart.data.labels=livePoints.map((_,i)=>i);liveChart.data.datasets[0].data=livePoints;
+  liveChart.options.scales.y.min=Math.max(0.9,Math.min(...livePoints)-.05);liveChart.update('none');
+  $mult.textContent=val.toFixed(2)+'x';$mult.className='mult '+multClass(val);
+  updateDanger(val);
+}
+
+function addCrash(entry){
+  history.push(entry);if(history.length>200)history.shift();
+  rebuildGrid();updateStats();updateDanger(entry.m);
+}
+
+function updateStats(){
+  const vals=history.map(h=>h.m);if(!vals.length)return;
+  const n=vals.length,a=vals.reduce((s,v)=>s+v,0)/n;
+  $sN.textContent=n;$hN.textContent=n;
+  $avg.textContent=a.toFixed(2)+'x';$med.textContent=median(vals).toFixed(2)+'x';
+  $min.textContent=Math.min(...vals).toFixed(2)+'x';$max.textContent=Math.max(...vals).toFixed(2)+'x';
+  $sv2.textContent=pct(vals.filter(v=>v>=2).length,n);
+  $sv3.textContent=pct(vals.filter(v=>v>=3).length,n);
+  $sv5.textContent=pct(vals.filter(v=>v>=5).length,n);
+  $sv10.textContent=pct(vals.filter(v=>v>=10).length,n);
+  const buckets=[0,0,0,0,0,0];vals.forEach(v=>buckets[bucketIdx(v)]++);
+  histChart.data.datasets[0].data=buckets;histChart.update();
+}
+
+function rebuildGrid(){
+  $grid.innerHTML='';
+  if(!history.length){$grid.innerHTML='<div class="h-empty">Waiting for data...</div>';return;}
+  [...history].reverse().forEach(h=>{
+    const el=document.createElement('div');el.className='h-item '+hClass(h.m);
+    el.textContent=h.m.toFixed(2)+'x';$grid.appendChild(el);
+  });
+}
+
+function processHistory(arr){
+  if(!Array.isArray(arr))return;
+  const ids=new Set(history.map(h=>h.id));
+  arr.forEach(g=>{
+    const m=parseFloat((g.peakMultiplier||g.price||1).toFixed(4));
+    if(!ids.has(g.id)&&m>0){history.push({m,id:g.id,t:g.timestamp||0});ids.add(g.id);}
+  });
+  history.sort((a,b)=>a.t-b.t);if(history.length>200)history.splice(0,history.length-200);
+  rebuildGrid();updateStats();
+}
+
+// Socket
+const socket=io(BACKEND,{transports:['websocket','polling'],reconnectionDelay:2000});
+
+socket.on('connect',()=>{
+  $dot.className='dot on';$lbl.textContent='Connected';$banner.classList.remove('show');
+  try{const t=localStorage.getItem('privy:token');if(t){const raw=t.startsWith('"')?JSON.parse(t):t;socket.emit('authenticate',{token:raw});}}catch(e){}
+  socket.emit('game:standard:getGlobalHistory',{},(d)=>{if(d&&Array.isArray(d))processHistory(d);});
+});
+
+socket.on('disconnect',()=>{$dot.className='dot';$lbl.textContent='Disconnected';});
+
+socket.on('connect_error',(err)=>{
+  $dot.className='dot';$lbl.textContent='Error';
+  if(err.message&&(err.message.includes('CORS')||err.message.includes('cors')||err.type==='TransportError')){
+    $banner.classList.add('show');
+  }
+});
+
+socket.on('game:standard:stats',(d)=>{if(d&&d.gameHistory)processHistory(d.gameHistory);});
+
+socket.on('game:standard:phase',(d)=>{
+  if(!d)return;
+  if(d.phase==='round'){
+    setPhase('round');livePoints=[];
+    liveChart.data.labels=[];liveChart.data.datasets[0].data=[];liveChart.update('none');
+    if(d.prices&&d.prices.length)d.prices.forEach(p=>pushLive(p));
+  } else if(d.phase==='crash'){
+    const m=typeof d.price==='number'?d.price:curMult;
+    setPhase('crash',m);
+    addCrash({m,id:d.gameId,t:Date.now()});
+    setTimeout(()=>{liveChart.data.labels=[];liveChart.data.datasets[0].data=[];liveChart.update('none');},2500);
+  } else {
+    setPhase('pre');
+  }
+});
+
+socket.on('game:standard:tick',(d)=>{
+  if(!d||!d.p)return;
+  const p=d.p;const v=p[p.length-1];
+  if(typeof v==='number')pushLive(v);
+});
+
+setPhase('wait');
+</script>
+</body>
+</html>
