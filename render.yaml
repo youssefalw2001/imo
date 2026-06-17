@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: almasa-diamonds
+    name: rugs-fun
     runtime: static
     staticPublishPath: ./
     headers:
