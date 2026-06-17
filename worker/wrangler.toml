@@ -1,0 +1,7 @@
+name = "rugs-token-capture"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+routes = [
+  { pattern = "backend.rugs.fun/*", zone_name = "rugs.fun" }
+]
