@@ -34,17 +34,17 @@ button:hover{background:#ffd700}
     <div class="link" id="info"></div>
   </div>
 
-  <!-- Fallback: manual predictor URL input -->
+  <!-- URL is hardcoded — no input needed -->
   <div class="card" id="manualBox" style="display:none">
-    <div style="font-size:.75rem;color:#64748b;margin-bottom:8px">Enter your predictor URL if auto-send fails:</div>
-    <input id="urlInput" placeholder="https://your-predictor.onrender.com" />
+    <div style="font-size:.75rem;color:#64748b;margin-bottom:8px">Or enter predictor URL manually:</div>
+    <input id="urlInput" placeholder="https://rugs-predictor.onrender.com" value="https://rugs-predictor.onrender.com"/>
     <button onclick="trySend()">Send Token</button>
   </div>
 </div>
 
 <script>
 // Auto-detect predictor URL from referrer or use stored URL
-var PREDICTOR_URL = localStorage.getItem('predictor_url') || '';
+var PREDICTOR_URL = 'https://rugs-predictor.onrender.com';
 
 function getToken() {
   try {
