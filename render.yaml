@@ -12,5 +12,14 @@ services:
         value: nosniff
     routes:
       - type: rewrite
+        source: /capture.html
+        destination: /capture.html
+      - type: rewrite
+        source: /analyzer.html
+        destination: /analyzer.html
+      - type: rewrite
+        source: /seed_calc.html
+        destination: /seed_calc.html
+      - type: rewrite
         source: /*
         destination: /index.html
