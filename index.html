@@ -70,79 +70,7 @@
 
     <link rel="preload" href="rugsfun_logo.png" as="image" />
 
-    <!-- Initial loading styles -->
-    <style>
-      #initial-loading {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background-color: #15161d;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-      }
 
-      #initial-loading-content {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 40px;
-        max-width: 400px;
-        width: 90%;
-      }
-
-      #initial-loading-logo {
-        max-width: 300px;
-        width: 100%;
-        height: auto;
-        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
-      }
-
-      #initial-progress-container {
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 16px;
-      }
-
-      #initial-progress-bar {
-        width: 100%;
-        height: 8px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 4px;
-        overflow: hidden;
-        position: relative;
-      }
-
-      #initial-progress-fill {
-        height: 100%;
-        background: linear-gradient(to right, #713f12, #ffc700);
-        border-radius: 4px;
-        width: 0%;
-        transition: width 0.3s ease;
-        position: relative;
-      }
-
-      #initial-progress-fill::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        right: 0;
-        width: 20px;
-        height: 100%;
-        background: linear-gradient(to right, transparent, #ffc700);
-        border-radius: 0 4px 4px 0;
-        box-shadow:
-          0 0 10px #ffc700,
-          0 0 20px #ffc700,
-          0 0 30px #ffc700;
-        opacity: 0.8;
-      }
-    </style>
     <script type="module" crossorigin src="assets/index-DiWWjbeP.js"></script>
     <link rel="modulepreload" crossorigin href="assets/rolldown-runtime-NVww-OeM.js">
     <link rel="modulepreload" crossorigin href="assets/clsx-Bly0sbKO.js">
@@ -281,92 +209,14 @@
       })();
     </script>
 
-    <!-- Initial loading screen that shows immediately -->
-    <div id="initial-loading">
-      <div id="initial-loading-content">
-        <img
-          id="initial-loading-logo"
-          src="rugsfun_logo.png"
-          alt="Rugs.fun Logo"
-        />
-        <script>
-          // Immediately set the correct logo based on detected theme
-          document.getElementById('initial-loading-logo').src = window.__initialLogoUrl;
-        </script>
-        <div id="initial-progress-container">
-          <div id="initial-progress-bar">
-            <div id="initial-progress-fill"></div>
-          </div>
-          <button id="skip-btn" onclick="window.hideInitialLoading()" style="display:none;margin-top:18px;background:transparent;border:1px solid rgba(255,199,0,0.4);color:rgba(255,199,0,0.8);padding:8px 28px;border-radius:20px;font-size:0.8rem;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;">
-            Skip →
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div id="root"></div>
+<div id="root"></div>
     <div id="modal-root"></div>
 
-    <!-- Initial progress simulation and React loading transition -->
+    <!-- Loading screen removed: React mounts directly into #root -->
     <script>
-      let initialProgress = 0;
-      const initialProgressFill = document.getElementById('initial-progress-fill');
-
-      // Simulate initial progress for basic page loading
-      function updateInitialProgress() {
-        if (initialProgress < 30) {
-          initialProgress += Math.random() * 5;
-          if (initialProgressFill) {
-            initialProgressFill.style.width = Math.min(initialProgress, 30) + '%';
-          }
-          setTimeout(updateInitialProgress, 100);
-        }
-      }
-
-      // Start initial progress simulation
-      updateInitialProgress();
-
-      // Global function for React to update progress
-      window.updateLoadingProgress = function (progress) {
-        // Re-query the element each time in case DOM changed
-        const currentProgressFill = document.getElementById('initial-progress-fill');
-        if (currentProgressFill) {
-          currentProgressFill.style.width = progress + '%';
-        }
-      };
-
-      // Function to hide initial loading when assets are loaded
-      window.hideInitialLoading = function () {
-        const el = document.getElementById('initial-loading');
-        if (el) {
-          el.style.transition = 'opacity 0.3s ease-out';
-          el.style.opacity = '0';
-          setTimeout(() => el.remove(), 300);
-        }
-      };
-
-      // Only apply skip/timeout on non-rugs.fun domains (Render, staging, etc.)
-      // On the real rugs.fun site, let the app control the loading screen normally
-      var _isRealSite = (window.location.hostname === 'rugs.fun' || window.location.hostname === 'www.rugs.fun');
-
-      if (!_isRealSite) {
-        // Auto-skip for returning users (have Privy token = was logged in before)
-        try {
-          if (localStorage.getItem('privy:token')) {
-            setTimeout(window.hideInitialLoading, 1500);
-          }
-        } catch(e) {}
-
-        // Show skip button after 2s for everyone on non-rugs.fun domains
-        setTimeout(function() {
-          var btn = document.getElementById('skip-btn');
-          if (btn) btn.style.display = 'inline-block';
-        }, 2000);
-
-        // HARD TIMEOUT — force-dismiss after 8s so nobody ever gets stuck
-        // Needed because Privy blocks initialization on non-rugs.fun domains
-        setTimeout(window.hideInitialLoading, 8000);
-      }
+      // No-ops so the app doesn't throw if it calls these
+      window.updateLoadingProgress = function() {};
+      window.hideInitialLoading = function() {};
     </script>
   <!-- Cloudflare Pages Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "8654f2873c6f4efd8adfdc2ae21240e0"}'></script><!-- Cloudflare Pages Analytics --></body>
 
