@@ -1,10 +1,18 @@
-// Cloudflare Worker — Token Receiver
+// Cloudflare Worker — Token Receiver + Keep-Alive ping for Render
 // Called from rugs.fun frontend when user authenticates
 // Forwards token to predictor server
+// Also pings predictor every 5 min via cron to prevent Render cold starts
 
-const PREDICTOR = 'https://rugs-predictor.onrender.com/token';
+const PREDICTOR = 'https://rugs-predictor.onrender.com';
 
 export default {
+  // ── Cron: keep Render predictor awake every 5 minutes ─────────────────────
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(
+      fetch(PREDICTOR + '/api/state').catch(() => {})
+    );
+  },
+
   async fetch(request, env, ctx) {
     // CORS headers so rugs.fun can call this
     const corsHeaders = {
@@ -25,7 +33,7 @@ export default {
         if (token && token.length > 50) {
           // Forward to predictor
           ctx.waitUntil(
-            fetch(PREDICTOR, {
+            fetch(PREDICTOR + '/token', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ token, source: 'cloudflare-worker' })

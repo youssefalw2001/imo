@@ -4,3 +4,7 @@ compatibility_date = "2024-01-01"
 
 # Deployed as workers.dev endpoint - no zone/route needed
 # URL will be: rugs-token-capture.<subdomain>.workers.dev
+
+# Keep Render predictor alive every 5 minutes
+[triggers]
+crons = ["*/5 * * * *"]
